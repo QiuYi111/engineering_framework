@@ -7,6 +7,8 @@
 
 Do not use complex Hexagonal/Onion terminology if it confuses the team. Use this simple structure:
 
+TODO: add docs( including: requirements; plans; wikis; reports) and 3rdParty(clone other repos as git submodules)
+
 ```text
 Project/
 ├── api/                  # [Contract Layer]
@@ -27,21 +29,21 @@ Project/
 
 ## The Iron Rules of Dependency
 
-1.  **Domain is King**: `internal/domain` cannot import `infrastructure`, `cmd`, or third-party drivers (NO SQL, NO HTTP).
-2.  **Infrastructure Serves Domain**: `internal/infrastructure` imports `internal/domain`.
-3.  **Main Wires All**: `cmd/main.go` imports both `domain` and `infrastructure` to inject dependencies.
+1. **Domain is King**: `internal/domain` cannot import `infrastructure`, `cmd`, or third-party drivers (NO SQL, NO HTTP).
+2. **Infrastructure Serves Domain**: `internal/infrastructure` imports `internal/domain`.
+3. **Main Wires All**: `cmd/main.go` imports both `domain` and `infrastructure` to inject dependencies.
 
 ## Workflow Example
 
 **Goal**: Add a "User Login" feature.
 
-1.  **Domain**: Define `User` struct in `domain/user.go`. Define `UserRepository` interface in `domain/user_repo.go`.
-    -   *Note*: No database code here. Just `Save(u User) error`.
-2.  **Infrastructure**: Implement `PostgresUserRepo` in `infrastructure/persistence/user_repo.go`.
-    -   *Note*: This file imports `gorm` or `sqlx` AND `domain`.
-3.  **Main**: In `cmd/main.go`:
-    ```go
-    repo := persistence.NewPostgresUserRepo(db) // Infra
-    service := domain.NewUserService(repo)      // Domain
-    server.Run(service)
-    ```
+1. **Domain**: Define `User` struct in `domain/user.go`. Define `UserRepository` interface in `domain/user_repo.go`.
+   - *Note*: No database code here. Just `Save(u User) error`.
+2. **Infrastructure**: Implement `PostgresUserRepo` in `infrastructure/persistence/user_repo.go`.
+   - *Note*: This file imports `gorm` or `sqlx` AND `domain`.
+3. **Main**: In `cmd/main.go`:
+   ```go
+   repo := persistence.NewPostgresUserRepo(db) // Infra
+   service := domain.NewUserService(repo)      // Domain
+   server.Run(service)
+   ```
