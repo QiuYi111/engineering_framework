@@ -7,7 +7,7 @@
 
 Do not use complex Hexagonal/Onion terminology if it confuses the team. Use this simple structure:
 
-TODO: add docs( including: requirements; plans; wikis; reports) and 3rdParty(clone other repos as git submodules)
+TODO: sync with guide
 
 ```text
 Project/

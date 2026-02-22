@@ -1,5 +1,7 @@
 # Product Requirement Document (PRD): {Project Name}
 
+> **Note for Authors**: This PRD must be written with clear, structured markdown. It is designed to be directly consumed by AI Agents (via `CLAUDE.md` workflows) as the definitive source of truth.
+
 | Version | Date | Status | Author | Remarks |
 | :--- | :--- | :--- | :--- | :--- |
 | v0.1.0 | 2024-01-01 | **Draft** | Team | Initial Definition |

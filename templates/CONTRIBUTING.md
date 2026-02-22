@@ -15,6 +15,7 @@ Welcome to the team. This document is not a suggestion; it is the **Law** of thi
     -   **Pure Logic?** TDD. Write `thing_test.go` before `thing.go`.
     -   **Feature Flow?** BDD. Write Integration Tests before wiring `main.go`.
 5.  **Observability**: No `print` statements. Use structured logs with searchable keys.
+6.  **AI-First Collaboration**: We leverage AI agents (e.g., Claude Code) governed by `CLAUDE.md`. Humans define the architecture and requirements, Agents assist in the execution. Always ensure AI context is up-to-date.
 
 ---
 
@@ -38,7 +39,12 @@ We do not memorize commands. We use `make`.
 
 When you pick up a ticket, follow this **exact** sequence:
 
-### Phase 1: Contact
+### Phase 0: AI Context Assembly
+1.  **Sync Framework**: Ensure `CLAUDE.md` is correctly configured in your project root.
+2.  **Generate Index**: Run `/sc:index-repo` (or equivalent) so the AI has the latest `project_index`.
+3.  **Feed Requirements**: Provide the Agent with the relevant `docs/requirements/` and `docs/plan/` files.
+
+### Phase 1: Contract
 1.  **Modify Contract**: Edit API definition.
 2.  **Gen**: Run `make proto`.
 3.  **Commit**: "feat(api): add new endpoint".
