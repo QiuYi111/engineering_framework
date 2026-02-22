@@ -20,7 +20,7 @@ Project/
 │   └── infrastructure/   # [Infra] DB, HTTP, RPC implementations
 ├── tests/                # [Verification] E2E / BDD Tests
 ├── scripts/              # [Automation] Helper scripts
-├── third_party/          # [Dependencies] Git submodules for external repos
+├── 3rdParty/          # [Dependencies] Git submodules for external repos
 ├── Makefile              # [Interface] The Command Center
 ├── docker-compose.yml    # [Environment] Infrastructure as Code
 └── CLAUDE.md             # [AI] Custom instructions & agent workflows
