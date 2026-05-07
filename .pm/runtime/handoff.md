@@ -15,7 +15,7 @@ Product contract is frozen. Harness is in feasibility stage for dogfood-grade `/
 
 ## Next Expected Action
 
-Create the fifth bounded feasibility task, then delegate to OpenCode intern.
+Wait for OpenCode intern to complete `.pm/runtime/next-task.md`, then review `.pm/runtime/worker-report.md`.
 
 ## Important Constraints
 
@@ -34,6 +34,7 @@ Create the fifth bounded feasibility task, then delegate to OpenCode intern.
 - Worker commit `df9f58e` is accepted as iteration 4.
 - Branch-policy mismatch is now visible in `pm-status` and blocks `pm-next`.
 - Next task should add deterministic resume-context support.
+- Current task adds read-only `pm-resume` context support.
 - No auto-merge, push, publish, or deploy.
 - Stop for core, infra, security, auth, payment, deployment, or product-boundary changes.
 

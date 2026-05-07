@@ -2,19 +2,22 @@
 
 ## Objective
 
-Add PM runtime branch-policy validation so `pm-status` and `pm-next` detect when the current git branch does not match the supervisor-managed goal branch.
+Add deterministic PM resume-context support so an interrupted supervisor loop can recover from `.pm/runtime` artifacts without guessing.
 
 ## Stage context
 
 Current stage: `feasibility`.
 
-Iteration 3 added `pm-next`, but the worker committed on `main` before supervisor remediated by fast-forwarding `codex/dogfood`. The next feasibility slice must make branch mismatch visible and block delegation before worker execution.
+This is the fifth bounded feasibility iteration. Prior iterations added PM status, next-action decisions, strict report validation, and branch-policy validation. The remaining core safety requirement is resume: after an interruption, the supervisor must be able to read state, handoff, loop-control, recent loop-log entries, and next-action decision in one place.
 
 ## Read first
 
-- `.pm/runtime/acceptance-review.md`
+- `.pm/stable/roadmap.md`
+- `.pm/stable/acceptance-rubric.md`
 - `.pm/runtime/state.yaml`
-- `.pm/stable/architecture-guardrails.md`
+- `.pm/runtime/handoff.md`
+- `.pm/runtime/loop-log.md`
+- `.pm/runtime/loop-control`
 - `scripts/harness_runtime/pm_runtime.py`
 - `scripts/harness_runtime/cli.py`
 - `tests/test_pm_runtime.py`
@@ -22,27 +25,30 @@ Iteration 3 added `pm-next`, but the worker committed on `main` before superviso
 
 ## Task
 
-Implement deterministic branch-policy validation.
+Implement a read-only resume-context helper.
 
 Required behavior:
 
-1. Add branch-policy validation in `scripts/harness_runtime/pm_runtime.py`.
-2. Compare current git branch from `inspect_git()` with `state.git.current_goal_branch`.
-3. If goal branch is set and current branch differs, return a structured warning/error such as:
-   - `status: mismatch`
-   - `current_branch`
-   - `expected_branch`
-   - `reason`
-4. Expose this in `get_pm_status()` output.
-5. Update `harness pm-status` to display branch-policy status.
-6. Update `decide_next_action()` so branch mismatch returns `request_user_decision` or `blocked` before `delegate` or `review`.
-7. Add tests for:
-   - matching branch -> ok
-   - mismatched branch -> branch-policy mismatch
-   - `pm-next` decision blocks or requests user decision on mismatch
-   - missing expected branch does not block
+1. Add a function in `scripts/harness_runtime/pm_runtime.py`, for example `get_resume_context(project_root: Path, log_entries: int = 3) -> dict`.
+2. It should return:
+   - current stage
+   - current phase
+   - loop iteration
+   - loop-control directive
+   - next-action decision from `decide_next_action()`
+   - handoff text or summary
+   - the last N loop-log entries
+   - branch-policy status
+   - worker-report status
+3. Add CLI command such as `harness pm-resume --project ... --log-entries 3`.
+4. CLI output should be concise and read-only.
+5. Add tests for:
+   - reading last N loop-log entries
+   - missing handoff or loop-log handled gracefully
+   - resume context includes next-action decision
+   - CLI-facing helper does not mutate files
 
-Do not mutate git branches. This task is read-only validation only.
+Do not implement autonomous loop execution yet. This task only creates the deterministic resume context needed by a future loop runner.
 
 ## Allowed scope
 
@@ -56,27 +62,27 @@ Do not mutate git branches. This task is read-only validation only.
 - `scripts/harness_runtime/verify.py`
 - `.pm/stable/*`
 - Product positioning or MVP boundary changes
-- Git branch mutation, auto-merge, auto-push, deployment, auth, payment, or security features
+- Worker execution, background daemon, queueing, auto-merge, auto-push, deployment, auth, payment, or security features
 - Modifying unrelated skill files
 
 ## Acceptance criteria
 
-- [ ] Branch mismatch is visible in `harness pm-status`.
-- [ ] Branch mismatch causes `harness pm-next` to avoid `delegate` and `review`.
-- [ ] Matching branch allows normal decision flow.
-- [ ] Missing expected goal branch does not block.
+- [ ] `harness pm-resume --project /Users/qiujingyi.7/Harness` runs and summarizes current resume context.
+- [ ] Resume context includes current phase, loop iteration, loop-control, branch-policy status, worker-report status, and `pm-next` decision.
+- [ ] Last N loop-log entries are extracted deterministically.
+- [ ] Missing handoff or loop-log does not crash the helper.
 - [ ] `uv run python -m unittest discover -s tests` passes.
 - [ ] `uv run harness verify-ai --project /Users/qiujingyi.7/Harness` still passes.
 - [ ] A clear git commit is created for this task only. Do not include the pre-existing `scripts/harness_runtime/verify.py` change.
 
 ## Required Harness process
 
-Risk classify manually before edits. This should be `leaf` or `branch`: read-only validation and CLI status only. If you judge it `core` or `infra`, stop and write a blocker report.
+Risk classify manually before edits. This should be `leaf` or `branch`: read-only resume context and CLI output only. If you judge it `core` or `infra`, stop and write a blocker report.
 
 Use a disciplined implementation flow:
 
 1. Understand task and allowed scope.
-2. Implement read-only branch-policy validation.
+2. Implement read-only resume context helper.
 3. Add focused tests.
 4. Run verification commands.
 5. Commit only task changes.
@@ -85,6 +91,7 @@ Use a disciplined implementation flow:
 ## Required verification commands
 
 ```bash
+uv run harness pm-resume --project /Users/qiujingyi.7/Harness
 uv run harness pm-status --project /Users/qiujingyi.7/Harness
 uv run harness pm-next --project /Users/qiujingyi.7/Harness
 uv run python -m unittest discover -s tests
