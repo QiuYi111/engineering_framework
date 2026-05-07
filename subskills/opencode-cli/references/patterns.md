@@ -1,5 +1,32 @@
 # OpenCode CLI 自动化模式
 
+## 模式 0: serve + attach（推荐，生产可用）
+
+`opencode run` 单独运行会因 TUI 实例占用数据库锁而报 "Session not found"。
+推荐先启动 serve 后台进程，再通过 attach 发送请求。serve 还能保持 MCP 服务器常驻，避免每次冷启动。
+
+```bash
+# 1. 启动后台服务（一次性，可加到 shell rc 或 systemd 中）
+opencode serve --port 4100 &
+SERVE_PID=$!
+
+# 2. 发送请求（可重复调用，共享 MCP 连接）
+opencode run --attach http://localhost:4100 -m zhipuai-coding-plan/glm-5.1 "Review this code"
+opencode run --attach http://localhost:4100 -f src/main.py "Add type hints"
+
+# 3. 获取 JSON 输出（用于脚本解析）
+opencode run --attach http://localhost:4100 --format json "Analyze architecture" > result.json
+
+# 4. 查询完整回复（JSON 流式输出可能不完整时）
+SESSION_ID=$(sqlite3 ~/.local/share/opencode/opencode.db \
+  "SELECT id FROM session ORDER BY time_updated DESC LIMIT 1;")
+sqlite3 ~/.local/share/opencode/opencode.db \
+  "SELECT json_extract(data, '$.text') FROM part WHERE session_id='$SESSION_ID' AND json_extract(data, '$.type')='text';"
+
+# 5. 完成后清理
+kill $SERVE_PID
+```
+
 ## 模式 1: CI/CD 集成
 
 ```bash

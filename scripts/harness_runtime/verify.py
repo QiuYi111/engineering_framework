@@ -10,6 +10,19 @@ SUPPORTING_TEMPLATES = [
     "ARCHITECTURE.md", "CONSTITUTION_TEMPLATE.md", "CONTRACT_TEMPLATE.md",
     "CONTRIBUTING.md", "DATA_MODEL_TEMPLATE.md", "Makefile", "QUICKSTART_TEMPLATE.md",
 ]
+PM_TEMPLATES = [
+    "pm/product.md", "pm/evidence.md", "pm/value-proposition.md",
+    "pm/ux-principles.md", "pm/user-journeys.md", "pm/ui-direction.md",
+    "pm/roadmap.md", "pm/stage-definitions.md", "pm/architecture-guardrails.md",
+    "pm/acceptance-rubric.md", "pm/state.yaml", "pm/active-stage.md",
+    "pm/next-task.md", "pm/worker-report.md", "pm/acceptance-review.md",
+    "pm/spike-report.md", "pm/blockers.md", "pm/loop-log.md",
+    "pm/handoff.md", "pm/loop-control", "pm/worker-config.yaml",
+]
+PM_STATE_REQUIRED_FIELDS = [
+    "project_id", "current_stage", "current_phase", "loop_iteration",
+    "readiness", "supervisor_authority", "worker", "next_action", "failure_tracking",
+]
 MAX_DESCRIPTION_LEN = 1024
 
 
