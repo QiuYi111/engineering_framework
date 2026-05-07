@@ -2,69 +2,78 @@
 
 ## Objective
 
-Replace supervisor delegation/review protocol with tested slash-command OpenCode invocations and add Makefile entrypoints for PM runtime verification.
+Add a read-only branch correction plan helper so supervisor can recover from branch drift without guessing or mutating git state.
 
 ## Stage context
 
-Stage 2: Unbounded `/goal` Dogfood. Stage 1 proved bounded feasibility, but dogfood exposed protocol drift: supervisor docs and worker config still describe old natural-language or `--agent harness-intern` delegation. This task hardens the PM loop before longer autonomous runs.
+Stage 2: Unbounded `/goal` Dogfood. Dogfood already exposed a real branch drift case: work landed on `main` while the goal branch was `codex/dogfood`. Branch-policy validation now blocks delegation, but it does not yet tell the supervisor whether safe correction is possible or what exact non-destructive command sequence should be used.
 
 ## Read first
 
-- `.pm/stable/product.md`
-- `.pm/stable/ux-principles.md`
-- `.pm/stable/user-journeys.md`
-- `.pm/stable/ui-direction.md`
 - `.pm/stable/roadmap.md`
+- `.pm/runtime/state.yaml`
 - `.pm/runtime/active-stage.md`
-- `.pm/decisions.md`
-- `subskills/supervisor/references/loop-steps.md`
-- `references/templates/pm/worker-config.yaml`
+- `.pm/runtime/acceptance-review.md`
+- `scripts/harness_runtime/pm_runtime.py`
+- `scripts/harness_runtime/cli.py`
+- `tests/test_pm_runtime.py`
+- `Makefile`
 
 ## Task
 
-Implement these protocol corrections:
+Implement a read-only branch correction plan:
 
-1. Update `.pm/runtime/worker-config.yaml` so sync delegation uses an explicit slash command:
-   `opencode run "/harness-intern Read and execute .pm/runtime/next-task.md exactly. Write .pm/runtime/worker-report.md and create one git commit for your task changes only." --file .pm/runtime/next-task.md`
-2. Update `references/templates/pm/worker-config.yaml` with the same slash-command pattern.
-3. Update `subskills/supervisor/references/loop-steps.md` Step 5 so supervisor delegation uses `/harness-intern ...`, not natural-language role-play and not `--agent harness-intern`.
-4. Update Step 6 review guidance to require independent OpenCode review via `/harness review ...` for branch+ risk or when worker claims are material. Recommend spawning multiple independent review agents when the review questions are separable.
-5. Record the dogfood decisions in `.pm/decisions.md`: slash-command delegation, independent reviewer agents, and commit taxonomy separating product commits, PM ledger commits, and checkpoint commits.
-6. Add a root `Makefile` because Harness project conventions require Makefile entrypoints. Include at least `test`, `verify-ai`, `pm-status`, `pm-next`, `pm-resume`, and `verify` targets. The targets should wrap the existing `uv run ...` commands instead of duplicating them throughout docs.
+1. Add a helper in `scripts/harness_runtime/pm_runtime.py`, for example `get_branch_correction_plan(project_root: Path) -> dict`.
+2. The helper must never mutate git state. It should inspect:
+   - current branch
+   - expected goal branch from `.pm/runtime/state.yaml`
+   - whether the expected branch exists
+   - whether the expected branch is an ancestor of the current branch
+   - whether the current branch is an ancestor of the expected branch
+3. Return one of these statuses:
+   - `ok`: already on expected branch or no goal branch configured
+   - `safe_fast_forward_goal_branch`: current branch contains expected branch history, so supervisor may safely fast-forward the goal branch to current HEAD and switch back
+   - `safe_switch_to_goal_branch`: expected branch contains current branch history, so supervisor may safely switch to expected branch
+   - `manual_review_required`: branches diverged or git state cannot prove safe correction
+   - `unknown`: git/state inspection failed
+4. Include explicit `commands` suggestions for the safe cases, but do not execute them.
+5. Add CLI command `harness pm-branch-plan --project ...` that prints the plan clearly.
+6. Add a Makefile target `pm-branch-plan`.
+7. Add focused tests using mocks/subprocess patching. Do not require creating real git repositories unless that is simpler and deterministic.
 
 ## Allowed scope
 
-- `.pm/runtime/worker-config.yaml`
-- `references/templates/pm/worker-config.yaml`
-- `subskills/supervisor/references/loop-steps.md`
-- `.pm/decisions.md`
+- `scripts/harness_runtime/pm_runtime.py`
+- `scripts/harness_runtime/cli.py`
+- `tests/test_pm_runtime.py`
 - `Makefile`
 - `.pm/runtime/worker-report.md` only to write the final worker report
 
 ## Forbidden scope
 
-- Changing product positioning
-- Expanding MVP boundary
-- Changing core tech stack
-- Core/infra/security/payment/auth changes without explicit approval
 - `scripts/harness_runtime/verify.py` because it has pre-existing uncommitted changes outside this task
 - `subskills/opencode-cli/SKILL.md` because it has pre-existing uncommitted changes outside this task
 - `subskills/opencode-cli/references/patterns.md` because it has pre-existing uncommitted changes outside this task
-- Any `.pm/stable/*` product-contract files
+- `.pm/stable/*`
+- Any command that mutates git state (`git switch`, `git branch -f`, `git merge`, `git reset`, `git checkout`, `git commit`, etc.) except the final task commit
+- Product positioning or MVP boundary changes
 
 ## Acceptance criteria
 
-- [ ] Worker config and template use `/harness-intern ...` slash-command delegation.
-- [ ] Supervisor loop docs no longer recommend `--agent harness-intern` or "Act as harness-intern" delegation.
-- [ ] Supervisor review docs require independent `/harness review ...` review for branch+ or material claims and mention parallel independent reviewers for separable review questions.
-- [ ] `.pm/decisions.md` records slash delegation, reviewer-agent, and commit-taxonomy decisions.
-- [ ] Root Makefile exists and `make test`, `make verify-ai`, `make pm-status`, `make pm-next`, `make pm-resume`, and `make verify` work.
-- [ ] Pre-existing dirty files listed in forbidden scope are not modified or staged by this task.
+- [ ] `get_branch_correction_plan()` is read-only and deterministic.
+- [ ] Current branch equals expected branch returns `ok`.
+- [ ] Missing goal branch returns `ok` with no commands.
+- [ ] Expected branch ancestor of current branch returns `safe_fast_forward_goal_branch` with suggested commands.
+- [ ] Current branch ancestor of expected branch returns `safe_switch_to_goal_branch` with suggested commands.
+- [ ] Diverged branches return `manual_review_required` with no mutation commands executed.
+- [ ] `harness pm-branch-plan --project /Users/qiujingyi.7/Harness` runs.
+- [ ] `make pm-branch-plan` runs.
+- [ ] `make verify` passes.
 - [ ] One clear git commit is created for this task only.
 
 ## Required Harness process
 
-Risk classify as leaf/branch. Use direct implementation plus report. Do not run broader architecture changes.
+Risk classify as branch: this touches PM runtime logic, CLI, tests, and Makefile, but must remain read-only. Use TDD-style implementation where practical: tests for branch plan behavior, then implementation, then verification, then report.
 
 ## Required verification commands
 
@@ -74,8 +83,10 @@ make verify-ai
 make pm-status
 make pm-next
 make pm-resume
+make pm-branch-plan
 make verify
 git status --short
+git log --oneline -1
 ```
 
 ## Required report file
