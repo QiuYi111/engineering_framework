@@ -83,3 +83,12 @@ Append-only log. Each supervisor iteration adds one entry.
 - Iteration valid count: 3
 - Iteration total count: 3
 - Next action: delegate branch-policy enforcement task
+
+## Supervisor Delegation 4
+
+- Date: 2026-05-07
+- Phase: waiting_for_worker
+- Branch: codex/dogfood
+- Summary: Wrote fourth bounded feasibility task for read-only branch-policy validation
+- Worker mode: sync OpenCode
+- Forbidden scope: pre-existing `scripts/harness_runtime/verify.py` change, `.pm/stable/*`, product boundary changes, git branch mutation

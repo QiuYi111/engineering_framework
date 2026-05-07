@@ -2,22 +2,19 @@
 
 ## Objective
 
-Add a deterministic PM next-action decision helper so the supervisor can compute whether to continue, review, request rework, stop, or ask the user before delegating.
+Add PM runtime branch-policy validation so `pm-status` and `pm-next` detect when the current git branch does not match the supervisor-managed goal branch.
 
 ## Stage context
 
 Current stage: `feasibility`.
 
-Iterations 1 and 2 added `harness pm-status` and strict worker-report validation. The next feasibility slice should add a read-only decision layer that turns PM runtime status into the supervisor's next action. This is the foundation for a future loop runner, but it must not execute workers yet.
+Iteration 3 added `pm-next`, but the worker committed on `main` before supervisor remediated by fast-forwarding `codex/dogfood`. The next feasibility slice must make branch mismatch visible and block delegation before worker execution.
 
 ## Read first
 
-- `.pm/stable/roadmap.md`
-- `.pm/stable/acceptance-rubric.md`
-- `.pm/stable/architecture-guardrails.md`
-- `.pm/runtime/state.yaml`
 - `.pm/runtime/acceptance-review.md`
-- `.pm/runtime/handoff.md`
+- `.pm/runtime/state.yaml`
+- `.pm/stable/architecture-guardrails.md`
 - `scripts/harness_runtime/pm_runtime.py`
 - `scripts/harness_runtime/cli.py`
 - `tests/test_pm_runtime.py`
@@ -25,32 +22,27 @@ Iterations 1 and 2 added `harness pm-status` and strict worker-report validation
 
 ## Task
 
-Implement a deterministic read-only next-action helper.
+Implement deterministic branch-policy validation.
 
 Required behavior:
 
-1. Add a function in `scripts/harness_runtime/pm_runtime.py`, for example `decide_next_action(project_root: Path) -> dict`.
-2. The decision helper must call or reuse `get_pm_status()` and inspect state, loop-control, worker-report status, iteration limits, and failure counters.
-3. Decision output should include at least:
-   - `action`: one of `delegate`, `review`, `request_rework`, `request_user_decision`, `stop`, `blocked`
-   - `reason`: short machine-readable-ish reason
-   - `details`: optional list of specific details
-4. Required decision rules:
-   - Invalid PM runtime state -> `stop`
-   - `loop-control` `STOP` -> `stop`
-   - `loop-control` `NEEDS_USER_DECISION` -> `request_user_decision`
-   - `loop-control` `BLOCKED` -> `blocked`
-   - `loop-control` `STAGE_EXIT_REACHED` -> `stop`
-   - If `max_iterations` is not null and `loop_iteration >= max_iterations` -> `stop`
-   - If `consecutive_failures >= max_consecutive_failures` -> `request_user_decision`
-   - If current phase is `waiting_for_worker` and report is `not_started` or `placeholder` -> `blocked` or `request_user_decision` with reason `waiting_for_worker_report`
-   - If worker report is `invalid` -> `request_rework`
-   - If worker report is `valid` and phase is `waiting_for_worker` or `review_pending` -> `review`
-   - If current phase is `ready_to_delegate` and loop-control is `CONTINUE` -> `delegate`
-5. Add a CLI command such as `harness pm-next` that prints the action, reason, and details. It must not mutate files.
-6. Add unit tests for the decision rules above using tempfile fixtures.
+1. Add branch-policy validation in `scripts/harness_runtime/pm_runtime.py`.
+2. Compare current git branch from `inspect_git()` with `state.git.current_goal_branch`.
+3. If goal branch is set and current branch differs, return a structured warning/error such as:
+   - `status: mismatch`
+   - `current_branch`
+   - `expected_branch`
+   - `reason`
+4. Expose this in `get_pm_status()` output.
+5. Update `harness pm-status` to display branch-policy status.
+6. Update `decide_next_action()` so branch mismatch returns `request_user_decision` or `blocked` before `delegate` or `review`.
+7. Add tests for:
+   - matching branch -> ok
+   - mismatched branch -> branch-policy mismatch
+   - `pm-next` decision blocks or requests user decision on mismatch
+   - missing expected branch does not block
 
-Do not implement full loop execution, OpenCode invocation, file mutation, branch mutation, auto-merge, push, deploy, or stage advancement in this task.
+Do not mutate git branches. This task is read-only validation only.
 
 ## Allowed scope
 
@@ -64,37 +56,37 @@ Do not implement full loop execution, OpenCode invocation, file mutation, branch
 - `scripts/harness_runtime/verify.py`
 - `.pm/stable/*`
 - Product positioning or MVP boundary changes
-- Worker execution, background daemon, queueing, auto-merge, auto-push, deployment, auth, payment, or security features
+- Git branch mutation, auto-merge, auto-push, deployment, auth, payment, or security features
 - Modifying unrelated skill files
 
 ## Acceptance criteria
 
-- [ ] `harness pm-next --project /Users/qiujingyi.7/Harness` runs and returns a deterministic next action.
-- [ ] Decision helper has tests for stop, user decision, blocked, request rework, review, and delegate paths.
-- [ ] Decision helper respects `max_iterations` and `consecutive_failures`.
-- [ ] The helper is read-only and does not mutate `.pm` or git.
+- [ ] Branch mismatch is visible in `harness pm-status`.
+- [ ] Branch mismatch causes `harness pm-next` to avoid `delegate` and `review`.
+- [ ] Matching branch allows normal decision flow.
+- [ ] Missing expected goal branch does not block.
 - [ ] `uv run python -m unittest discover -s tests` passes.
 - [ ] `uv run harness verify-ai --project /Users/qiujingyi.7/Harness` still passes.
 - [ ] A clear git commit is created for this task only. Do not include the pre-existing `scripts/harness_runtime/verify.py` change.
 
 ## Required Harness process
 
-Risk classify manually before edits. This should be `branch` at most because it adds a read-only CLI decision helper. If you judge it `core` or `infra`, stop and write a blocker report.
+Risk classify manually before edits. This should be `leaf` or `branch`: read-only validation and CLI status only. If you judge it `core` or `infra`, stop and write a blocker report.
 
 Use a disciplined implementation flow:
 
 1. Understand task and allowed scope.
-2. Implement the smallest deterministic decision helper.
+2. Implement read-only branch-policy validation.
 3. Add focused tests.
 4. Run verification commands.
-5. Commit only your task changes.
+5. Commit only task changes.
 6. Write `.pm/runtime/worker-report.md`.
 
 ## Required verification commands
 
 ```bash
-uv run harness pm-next --project /Users/qiujingyi.7/Harness
 uv run harness pm-status --project /Users/qiujingyi.7/Harness
+uv run harness pm-next --project /Users/qiujingyi.7/Harness
 uv run python -m unittest discover -s tests
 uv run harness verify-ai --project /Users/qiujingyi.7/Harness
 git status --short
