@@ -8,6 +8,7 @@ from scripts.harness_runtime.pm_runtime import (
     classify_loop_control,
     decide_next_action,
     get_pm_status,
+    get_resume_context,
     inspect_git,
     parse_state_yaml,
     validate_branch_policy,
@@ -837,6 +838,212 @@ class TestValidateBranchPolicy(unittest.TestCase):
                 status = get_pm_status(root)
             self.assertIn("branch_policy", status)
             self.assertEqual(status["branch_policy"]["status"], "ok")
+
+
+class TestGetResumeContext(unittest.TestCase):
+    _BASE_STATE = textwrap.dedent("""\
+        project_id: "test"
+        current_stage: "feasibility"
+        current_phase: "ready_to_delegate"
+        loop_iteration: 3
+        consecutive_failures: 0
+        max_consecutive_failures: 3
+        readiness: {}
+        worker: {engine: opencode, role: intern, mode: sync}
+        git: {branch_policy: supervisor_managed, current_goal_branch: "codex/dogfood", auto_merge: false, auto_push: false}
+        next_action: {type: delegate, summary: x, blocked: false, needs_user_decision: false}
+        failure_tracking: {}
+    """)
+
+    _LOOP_LOG = textwrap.dedent("""\
+        # Loop Log
+
+        ## Iteration 0
+
+        - Date: 2026-05-07
+        - Phase: product_definition
+        - Summary: First entry.
+
+        ## Supervisor Delegation 1
+
+        - Date: 2026-05-07
+        - Phase: waiting_for_worker
+        - Summary: Second entry.
+
+        ## Supervisor Review 1
+
+        - Date: 2026-05-07
+        - Phase: ready_to_delegate
+        - Summary: Third entry.
+
+        ## Supervisor Delegation 2
+
+        - Date: 2026-05-07
+        - Phase: waiting_for_worker
+        - Summary: Fourth entry.
+    """)
+
+    def _make_project(self, tmp: str, *,
+                      state_yaml: str | None = None,
+                      loop_log: str | None = None,
+                      handoff: str | None = None,
+                      worker_report: str | None = None,
+                      loop_control: str = "CONTINUE",
+                      omit_handoff: bool = False,
+                      omit_loop_log: bool = False) -> Path:
+        root = Path(tmp)
+        files = {}
+        for name in [
+            "product.md", "roadmap.md", "architecture-guardrails.md", "acceptance-rubric.md"
+        ]:
+            files[f".pm/stable/{name}"] = "content"
+        files[".pm/runtime/state.yaml"] = state_yaml or self._BASE_STATE
+        files[".pm/runtime/active-stage.md"] = "stage"
+        if not omit_handoff:
+            files[".pm/runtime/handoff.md"] = handoff or "# Handoff\n\nResume here."
+        if not omit_loop_log:
+            files[".pm/runtime/loop-log.md"] = loop_log or self._LOOP_LOG
+        files[".pm/runtime/loop-control"] = loop_control
+        files[".pm/runtime/next-task.md"] = "task"
+        if worker_report is not None:
+            files[".pm/runtime/worker-report.md"] = worker_report
+        _write_tree(root, files)
+        return root
+
+    def test_includes_next_action_decision(self):
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "codex/dogfood", "dirty_files": [], "error": None}):
+                ctx = get_resume_context(root)
+            self.assertIsNotNone(ctx["next_action"])
+            self.assertEqual(ctx["next_action"]["action"], "delegate")
+            self.assertEqual(ctx["next_action"]["reason"], "ready_to_delegate")
+
+    def test_last_n_loop_log_entries(self):
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "codex/dogfood", "dirty_files": [], "error": None}):
+                ctx = get_resume_context(root, log_entries=2)
+            self.assertEqual(len(ctx["recent_log_entries"]), 2)
+            self.assertIn("Supervisor Review 1", ctx["recent_log_entries"][0])
+            self.assertIn("Supervisor Delegation 2", ctx["recent_log_entries"][1])
+
+    def test_log_entries_default_three(self):
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "codex/dogfood", "dirty_files": [], "error": None}):
+                ctx = get_resume_context(root)
+            self.assertEqual(len(ctx["recent_log_entries"]), 3)
+
+    def test_missing_handoff_handled_gracefully(self):
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, omit_handoff=True)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "codex/dogfood", "dirty_files": [], "error": None}):
+                ctx = get_resume_context(root)
+            self.assertIsNone(ctx["handoff"])
+
+    def test_missing_loop_log_handled_gracefully(self):
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, omit_loop_log=True)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "codex/dogfood", "dirty_files": [], "error": None}):
+                ctx = get_resume_context(root)
+            self.assertEqual(ctx["recent_log_entries"], [])
+
+    def test_includes_branch_policy(self):
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "codex/dogfood", "dirty_files": [], "error": None}):
+                ctx = get_resume_context(root)
+            self.assertEqual(ctx["branch_policy"]["status"], "ok")
+
+    def test_includes_worker_report_status(self):
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "codex/dogfood", "dirty_files": [], "error": None}):
+                ctx = get_resume_context(root)
+            self.assertEqual(ctx["worker_report"]["status"], "not_started")
+
+    def test_includes_stage_phase_iteration(self):
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "codex/dogfood", "dirty_files": [], "error": None}):
+                ctx = get_resume_context(root)
+            self.assertEqual(ctx["stage"], "feasibility")
+            self.assertEqual(ctx["phase"], "ready_to_delegate")
+            self.assertEqual(ctx["loop_iteration"], 3)
+
+    def test_read_only_does_not_mutate_files(self):
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp)
+            snapshot = {}
+            for rel in [".pm/runtime/state.yaml", ".pm/runtime/handoff.md",
+                        ".pm/runtime/loop-log.md", ".pm/runtime/loop-control"]:
+                p = root / rel
+                snapshot[rel] = p.read_text() if p.exists() else None
+
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "codex/dogfood", "dirty_files": [], "error": None}):
+                get_resume_context(root)
+
+            for rel, original in snapshot.items():
+                p = root / rel
+                current = p.read_text() if p.exists() else None
+                self.assertEqual(current, original, f"{rel} was mutated")
+
+    def test_missing_state_handled_gracefully(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            files = {}
+            for name in [
+                "product.md", "roadmap.md", "architecture-guardrails.md", "acceptance-rubric.md"
+            ]:
+                files[f".pm/stable/{name}"] = "content"
+            files[".pm/runtime/active-stage.md"] = "stage"
+            files[".pm/runtime/handoff.md"] = "# Handoff"
+            files[".pm/runtime/loop-control"] = "CONTINUE"
+            files[".pm/runtime/next-task.md"] = "task"
+            _write_tree(root, files)
+
+            ctx = get_resume_context(root)
+            self.assertIsNone(ctx["stage"])
+            self.assertIsNone(ctx["phase"])
 
 
 if __name__ == "__main__":

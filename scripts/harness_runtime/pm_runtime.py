@@ -388,6 +388,107 @@ def decide_next_action(project_root: Path) -> dict:
     return {"action": "stop", "reason": "unknown_state", "details": [f"directive={directive}, phase={phase}"]}
 
 
+def _parse_loop_log_entries(loop_log_path: Path) -> list[str]:
+    """Parse loop-log.md into a list of entry strings (one per ## heading section).
+
+    Returns empty list if the file is missing or empty.
+    """
+    if not loop_log_path.exists():
+        return []
+
+    content = loop_log_path.read_text().strip()
+    if not content:
+        return []
+
+    lines = content.splitlines()
+    entries: list[str] = []
+    current_lines: list[str] = []
+
+    for line in lines:
+        if line.startswith("## "):
+            if current_lines:
+                entries.append("\n".join(current_lines).strip())
+            current_lines = [line]
+        elif line.startswith("# "):
+            continue
+        elif current_lines:
+            current_lines.append(line)
+
+    if current_lines:
+        entries.append("\n".join(current_lines).strip())
+
+    return entries
+
+
+def get_resume_context(project_root: Path, log_entries: int = 3) -> dict:
+    """Deterministic read-only resume-context helper.
+
+    Collects everything an interrupted supervisor loop needs to recover:
+    current stage/phase, loop iteration, loop-control directive, next-action
+    decision, handoff text, recent loop-log entries, branch-policy status,
+    and worker-report status.
+
+    Missing files are handled gracefully — None or empty values are returned
+    rather than raising.
+
+    Returns dict with:
+        stage, phase, loop_iteration, loop_control, next_action,
+        handoff, recent_log_entries, branch_policy, worker_report
+    """
+    # ── State ────────────────────────────────────────────────────────────
+    stage = None
+    phase = None
+    loop_iteration = None
+    try:
+        state = parse_state_yaml(project_root)
+        stage = state.get("stage")
+        phase = state.get("phase")
+        loop_iteration = state.get("loop_iteration")
+    except (FileNotFoundError, ValueError):
+        pass
+
+    # ── Loop control ─────────────────────────────────────────────────────
+    loop_control = classify_loop_control(project_root)
+
+    # ── Next-action decision ─────────────────────────────────────────────
+    next_action: dict = {"action": None, "reason": None, "details": []}
+    try:
+        next_action = decide_next_action(project_root)
+    except Exception:
+        pass
+
+    # ── Handoff ──────────────────────────────────────────────────────────
+    handoff_path = project_root / ".pm" / "runtime" / "handoff.md"
+    handoff: str | None = None
+    if handoff_path.exists():
+        text = handoff_path.read_text().strip()
+        if text:
+            handoff = text
+
+    # ── Loop log entries ─────────────────────────────────────────────────
+    loop_log_path = project_root / ".pm" / "runtime" / "loop-log.md"
+    all_entries = _parse_loop_log_entries(loop_log_path)
+    recent = all_entries[-log_entries:] if log_entries > 0 else []
+
+    # ── Branch policy ────────────────────────────────────────────────────
+    branch_policy = validate_branch_policy(project_root)
+
+    # ── Worker report ────────────────────────────────────────────────────
+    worker_report = validate_worker_report(project_root)
+
+    return {
+        "stage": stage,
+        "phase": phase,
+        "loop_iteration": loop_iteration,
+        "loop_control": loop_control,
+        "next_action": next_action,
+        "handoff": handoff,
+        "recent_log_entries": recent,
+        "branch_policy": branch_policy,
+        "worker_report": worker_report,
+    }
+
+
 def get_pm_status(project_root: Path) -> dict:
     """Collect full PM runtime status for a project.
 

@@ -10,7 +10,7 @@ from .verify import run_full_verify, check_role_boundaries
 from .evals import run_eval
 from .context import build_context, format_context, write_context, build_context_cache_aware, format_context_cache_aware
 from .installer import install_skills
-from .pm_runtime import decide_next_action, get_pm_status
+from .pm_runtime import decide_next_action, get_pm_status, get_resume_context
 
 DIST_ROOT = Path(__file__).resolve().parent.parent.parent
 RESOURCES_DIR = DIST_ROOT / "references"
@@ -537,6 +537,58 @@ def pm_next(project):
             click.echo(f"  - {d}")
     else:
         click.echo("Details: (none)")
+
+
+@main.command("pm-resume")
+@click.option("--project", default=None, help="Project root (default: git root or cwd)")
+@click.option("--log-entries", default=3, type=int, help="Number of recent loop-log entries to show")
+def pm_resume(project, log_entries):
+    """Summarize current resume context for an interrupted supervisor loop."""
+    project_root = Path(project).resolve() if project else _git_root()
+    ctx = get_resume_context(project_root, log_entries=log_entries)
+
+    click.echo("=== PM Resume Context ===\n")
+
+    click.echo(f"Stage: {ctx['stage'] or 'N/A'}")
+    click.echo(f"Phase: {ctx['phase'] or 'N/A'}")
+    click.echo(f"Loop iteration: {ctx['loop_iteration'] or 'N/A'}")
+
+    lc = ctx["loop_control"]
+    click.echo(f"Loop control: {lc['directive'] or 'N/A'} ({'valid' if lc['valid'] else 'INVALID'} — {lc['reason']})")
+
+    na = ctx["next_action"]
+    click.echo(f"\nNext action: {na.get('action') or 'N/A'}")
+    click.echo(f"Reason: {na.get('reason') or 'N/A'}")
+    if na.get("details"):
+        for d in na["details"]:
+            click.echo(f"  - {d}")
+
+    bp = ctx["branch_policy"]
+    bp_status = bp.get("status", "unknown")
+    click.echo(f"\nBranch policy: {bp_status}")
+    if bp.get("current_branch"):
+        click.echo(f"  Current: {bp['current_branch']}")
+    if bp.get("expected_branch"):
+        click.echo(f"  Expected: {bp['expected_branch']}")
+
+    wr = ctx["worker_report"]
+    click.echo(f"Worker report: {wr['status']} — {wr['reason']}")
+
+    if ctx["handoff"]:
+        lines = ctx["handoff"].splitlines()
+        click.echo(f"\nHandoff ({len(lines)} lines):")
+        for line in lines[:5]:
+            click.echo(f"  {line}")
+        if len(lines) > 5:
+            click.echo(f"  ... ({len(lines) - 5} more lines)")
+    else:
+        click.echo("\nHandoff: (none)")
+
+    entries = ctx["recent_log_entries"]
+    click.echo(f"\nRecent log entries ({len(entries)}):")
+    for entry in entries:
+        first_line = entry.splitlines()[0] if entry else "(empty)"
+        click.echo(f"  {first_line}")
 
 
 if __name__ == "__main__":
