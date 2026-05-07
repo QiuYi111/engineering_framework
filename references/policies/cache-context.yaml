@@ -9,6 +9,16 @@ stable_prefix:
   - CACHE.md
   - .harness/policies/blast-radius.yaml
 
+# PM stable files (product contract — rarely changes after grill)
+pm_stable_prefix:
+  - .pm/stable/product.md
+  - .pm/stable/ux-principles.md
+  - .pm/stable/user-journeys.md
+  - .pm/stable/ui-direction.md
+  - .pm/stable/roadmap.md
+  - .pm/stable/architecture-guardrails.md
+  - .pm/stable/acceptance-rubric.md
+
 semi_stable_context:
   - project_index/repo.md
   - project_index/modules/*.md
@@ -25,6 +35,15 @@ dynamic_suffix:
   - git_diff
   - test_logs
   - error_messages
+
+# PM runtime files (change every iteration — keep in dynamic layer)
+pm_dynamic_suffix:
+  - .pm/runtime/state.yaml
+  - .pm/runtime/next-task.md
+  - .pm/runtime/worker-report.md
+  - .pm/runtime/acceptance-review.md
+  - .pm/runtime/loop-log.md
+  - .pm/runtime/loop-control
 
 ignore:
   - .git/**

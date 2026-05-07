@@ -1,0 +1,27 @@
+# Worker Execution Configuration
+# Used by: harness-supervisor Step 5 (DELEGATE_TO_OPENCODE)
+# Controls how the supervisor delegates tasks to the worker (intern).
+
+worker:
+  engine: opencode
+  role: intern
+  mode: manual  # manual | sync | poll
+  command: "opencode run --agent harness-intern --file .pm/runtime/next-task.md"
+  report_path: ".pm/runtime/worker-report.md"
+  timeout_minutes: 30
+
+# Execution modes:
+#
+# manual:
+#   Write next-task.md, then STOP/NEEDS_WORKER_EXECUTION.
+#   User or orchestrator triggers the worker separately.
+#   Supervisor polls for worker-report.md on next iteration.
+#
+# sync:
+#   Execute opencode command directly in current session.
+#   Wait for worker-report.md to appear before proceeding.
+#
+# poll:
+#   Write task, then enter worker_running phase.
+#   Next iteration checks for worker-report.md.
+#   Timeout after timeout_minutes triggers NEEDS_USER_DECISION.

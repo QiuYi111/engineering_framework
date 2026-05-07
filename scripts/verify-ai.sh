@@ -123,6 +123,56 @@ else
 fi
 echo ""
 
+# --- PM template check (optional) ---
+echo "--- PM Templates ---"
+PM_DIR="$REPO_ROOT/references/templates/pm"
+if [ -d "$PM_DIR" ]; then
+    PM_TEMPLATES=(
+        "product.md"
+        "evidence.md"
+        "value-proposition.md"
+        "ux-principles.md"
+        "user-journeys.md"
+        "ui-direction.md"
+        "roadmap.md"
+        "stage-definitions.md"
+        "architecture-guardrails.md"
+        "acceptance-rubric.md"
+        "state.yaml"
+        "active-stage.md"
+        "next-task.md"
+        "worker-report.md"
+        "acceptance-review.md"
+        "spike-report.md"
+        "blockers.md"
+        "loop-log.md"
+        "handoff.md"
+        "loop-control"
+        "worker-config.yaml"
+    )
+    for tmpl in "${PM_TEMPLATES[@]}"; do
+        check_file "PM template: $tmpl" "$PM_DIR/$tmpl"
+    done
+
+    # Schema check: state.yaml must contain required fields
+    if [ -f "$PM_DIR/state.yaml" ]; then
+        REQUIRED_FIELDS=("project_id" "current_stage" "current_phase" "loop_iteration" "readiness" "supervisor_authority" "worker" "next_action" "failure_tracking")
+        for field in "${REQUIRED_FIELDS[@]}"; do
+            if grep -q "^${field}:" "$PM_DIR/state.yaml" || grep -q "^  ${field}:" "$PM_DIR/state.yaml"; then
+                echo "✅ state.yaml has field: $field"
+                passed=$((passed + 1))
+            else
+                echo "❌ state.yaml MISSING field: $field"
+                failed=$((failed + 1))
+            fi
+        done
+    fi
+else
+    echo "⚠️  No references/templates/pm/ directory found (PM templates optional)"
+    warnings=$((warnings + 1))
+fi
+echo ""
+
 # --- Summary ---
 echo "=== Summary ==="
 echo "✅ $passed passed"

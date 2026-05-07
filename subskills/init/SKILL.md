@@ -64,7 +64,7 @@ Bootstrap a project with the full Harness engineering stack: spec governance, DD
 When `--pm` is specified, additionally create:
 
 - **`.pm/stable/`** — copy all templates from `references/templates/pm/` (product.md, evidence.md, value-proposition.md, ux-principles.md, user-journeys.md, ui-direction.md, roadmap.md, stage-definitions.md, architecture-guardrails.md, acceptance-rubric.md)
-- **`.pm/runtime/`** — copy runtime templates (state.yaml, active-stage.md, next-task.md, worker-report.md, acceptance-review.md, spike-report.md, blockers.md, loop-log.md, handoff.md, loop-control)
+- **`.pm/runtime/`** — copy runtime templates (state.yaml, active-stage.md, next-task.md, worker-report.md, acceptance-review.md, spike-report.md, blockers.md, loop-log.md, handoff.md, loop-control, worker-config.yaml)
 - **`.pm/design/`** — empty directory for design probes and UI feedback
 - **`.pm/decisions.md`** — decision log template
 - **`.pm/runtime/loop-control`** — initialized with `CONTINUE`

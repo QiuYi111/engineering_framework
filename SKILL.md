@@ -18,11 +18,12 @@ You are the Harness router. Detect phase, load sub-skill, run CLI gates.
 
 ## First Move
 
-1. Check whether Harness is installed in this repo (look for `.harness/`, `AGENTS.md`, `specs/`).
-2. If not installed, load and execute `harness-init`.
-3. If installed, run `harness status` to see active features and gate status.
-4. Identify the current phase using `./references/PHASE_DETECTION.md`.
-5. Load the appropriate sub-skill using `./references/ROUTING_TABLE.md`.
+1. **Check user intent first.** If the user's intent is product discovery ("I have an idea", "worth building", "product definition", "MVP", "UI direction"), route to `harness-grill-product` immediately — even if Harness is not installed. Product discovery does NOT require `.harness/` or `specs/`.
+2. Check whether Harness is installed in this repo (look for `.harness/`, `AGENTS.md`, `specs/`).
+3. If not installed and user intent is engineering (implement, debug, refactor), load and execute `harness-init`.
+4. If installed, run `harness status` to see active features and gate status.
+5. Identify the current phase using `./references/PHASE_DETECTION.md`.
+6. Load the appropriate sub-skill using `./references/ROUTING_TABLE.md`.
 
 ## Autopilot
 
@@ -68,3 +69,7 @@ Stop and ask the human before proceeding when:
 - `./references/PHASE_DETECTION.md` -- how to detect current phase from repo artifacts
 - `./references/AUTOPILOT_RULES.md` -- auto-advance rules per risk level
 - `./references/DOMAIN-AWARENESS.md` -- domain terminology and DDD rules
+
+## Path Convention
+
+All paths in Harness skill references are relative to the **Harness repository root** (the directory containing this `SKILL.md`), unless explicitly prefixed with `./` (current working directory) or `.pm/` (project PM directory). Subskills reference each other using repo-root paths like `subskills/risk/SKILL.md`, not relative paths like `../risk/SKILL.md`.

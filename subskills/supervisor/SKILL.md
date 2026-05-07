@@ -18,7 +18,7 @@ Each iteration follows exactly these 8 steps, in order:
 
 1. **OBSERVE** — Read state, stage, roadmap, product, and prior iteration artifacts; check iteration limit.
 2. **CHECK_READINESS** — Verify readiness flags before delegating any implementation work.
-3. **DECIDE** — Choose exactly ONE next action (grill_product, feasibility_spike, delegate, review, request_user_decision, stop).
+3. **DECIDE** — Choose exactly ONE next action (grill_product, feasibility_spike, delegate, review, request_rework, request_user_decision, stop).
 4. **WRITE_TASK** — Write a bounded, verifiable, scoped task packet to `.pm/runtime/next-task.md`.
 5. **DELEGATE_TO_OPENCODE** — Invoke OpenCode Intern; wait for worker-report.md before proceeding.
 6. **REVIEW_REPORT** — Reject if sections missing; verify evidence; accept or request rework.
@@ -36,7 +36,7 @@ See `references/safety-mechanisms.md` for iteration limits, consecutive failure 
 - Loop steps: `references/loop-steps.md` — full step-by-step loop procedure
 - Safety: `references/safety-mechanisms.md` — iteration limits, failure breaker, stop conditions, file writing rules
 - Authority: `references/authority.md` — role, authority matrix, resume protocol, before-starting checklist
-- Templates: `references/templates/pm/` — all state and task templates
+- Templates: `references/templates/pm/` — all state and task templates (repo-root relative)
 - grill-product: `subskills/grill-product/SKILL.md` — product discovery skill
 - Risk: `subskills/risk/SKILL.md` — blast radius classification
 - Context: `subskills/context/SKILL.md` — minimal context bundle generation

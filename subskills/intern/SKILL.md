@@ -45,10 +45,10 @@ You are the engineering intern. You execute bounded tasks. You read the task pac
 - `references/scope-and-quality.md` — scope discipline, blocker protocol, quality rules
 
 ### Templates and policies
-- Task template: `references/templates/pm/next-task.md`
-- Report template: `references/templates/pm/worker-report.md`
-- Acceptance rubric: `references/templates/pm/acceptance-rubric.md`
-- Architecture guardrails: `references/templates/pm/architecture-guardrails.md`
+- Task template: `references/templates/pm/next-task.md` (repo-root relative)
+- Report template: `references/templates/pm/worker-report.md` (repo-root relative)
+- Acceptance rubric: `references/templates/pm/acceptance-rubric.md` (repo-root relative)
+- Architecture guardrails: `references/templates/pm/architecture-guardrails.md` (repo-root relative)
 
 ### Harness subskills
 - Risk: `subskills/risk/SKILL.md`

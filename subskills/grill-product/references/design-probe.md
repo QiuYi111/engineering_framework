@@ -22,6 +22,28 @@ Get user to pick or blend before generating full descriptions.
 
 **Step 3: Present comparison and collect feedback.** Record in `.pm/design/ui-feedback.md`.
 
+If visual mockups were generated (via canvas-design, design-shotgun, or similar), store them in `.pm/design/generated-concepts/`:
+```
+.pm/design/generated-concepts/
+├── concept-a.png
+├── concept-b.png
+├── concept-c.png
+└── approved.json
+```
+
+`approved.json` format:
+```json
+{
+  "approved_concept": "concept-b",
+  "approved_at": "ISO-8601-date",
+  "liked": ["information density", "typography hierarchy"],
+  "disliked": ["too much gradient"],
+  "implementation_notes": ["use B layout with A color restraint"]
+}
+```
+
+The Supervisor and Intern read `approved.json` to determine the approved visual source for UI implementation.
+
 **Step 4: Iteration.** If the user rejects all 3, generate 3 new ones incorporating their feedback. Maximum 2 regeneration rounds. If still no match after 2 rounds, escalate:
 > "I'm not finding the right direction. Can you share a screenshot of a product whose visual feel you like?"
 

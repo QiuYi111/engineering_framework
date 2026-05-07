@@ -27,7 +27,7 @@ Before delegating ANY implementation work, verify:
 | `product_definition_ready` | All work |
 | `roadmap_ready` | All work |
 | `ux_ready` | Product-facing work |
-| `ux_depth` | Product-facing work — if `light` and task involves UI implementation, request user to supplement UX before delegating |
+| `ux_depth` | Product-facing work — `missing`: no UI-facing delivery; `light`: prototypes only, no formal UI implementation; `full`: UI implementation allowed; `not_applicable`: CLI/backend-only |
 | `ui_direction_ready` | UI-facing work |
 | `feasibility_ready` | Delivery loop (Stage 2+) |
 
@@ -48,6 +48,7 @@ Choose exactly ONE next action:
 | `feasibility_spike` | Technical path uncertain |
 | `delegate` | Ready to delegate bounded task |
 | `review` | Worker report exists, needs review |
+| `request_rework` | Worker report rejected, needs rework with specific feedback |
 | `request_user_decision` | Product/MVP/tech/taste/risk decision needed |
 | `stop` | Stage exit reached or stop condition triggered |
 
@@ -82,25 +83,28 @@ If action is `delegate` or `feasibility_spike`, write `.pm/runtime/next-task.md`
 - For leaf-risk: `harness-tdd` + `harness-report` may suffice
 - For branch-risk: full chain
 
-**Template**: Use `references/templates/pm/next-task.md` structure.
+**Template**: Use `references/templates/pm/next-task.md` structure (repo-root relative).
 
 ## Step 5: DELEGATE_TO_OPENCODE
 
-Invoke OpenCode Intern to execute the task.
+Read `.pm/runtime/worker-config.yaml` for execution mode. Default is `manual` if file is missing.
 
-**Primary method** — load the Intern skill and pass the task:
+**manual mode** — Write `.pm/runtime/next-task.md`, then set `current_phase: worker_running` in state.yaml and STOP. The worker is triggered separately. Supervisor will check for the report on the next iteration.
+
+**sync mode** — Execute the worker in the current session:
 ```
 Load harness-intern skill, instruct: "Read and execute .pm/runtime/next-task.md"
 ```
-
-**Alternative method** — if the agent system supports `--agent` syntax:
+Or if the agent system supports `--agent` syntax:
 ```
 opencode run --agent harness-intern --file .pm/runtime/next-task.md
 ```
 
-**Fallback** — if neither method works, read `.pm/runtime/next-task.md` in the current session and execute the Intern's execution flow directly (see `subskills/intern/references/execution-flow.md`).
+**poll mode** — Write task, set `current_phase: worker_running`. On next iteration, check for worker-report.md. If `timeout_minutes` exceeded, set `NEEDS_USER_DECISION` in loop-control.
 
-**Critical**: Do NOT assume OpenCode succeeded. Wait for `.pm/runtime/worker-report.md` to exist and be updated.
+**Fallback** — if neither sync method works, treat as manual mode.
+
+**Critical**: Do NOT assume the worker succeeded. Wait for `.pm/runtime/worker-report.md` to exist and be updated.
 
 ## Step 6: REVIEW_REPORT
 
@@ -120,6 +124,10 @@ Read `.pm/runtime/worker-report.md`.
 - List specific missing sections
 - Do NOT update loop_iteration until a valid report is reviewed
 - **Increment `consecutive_failures` in state.yaml**
+- **Update `failure_tracking`** in state.yaml:
+  - Set `last_failure_signature` to one of: `missing_report_sections | tests_failed | scope_violation | forbidden_files_touched | no_evidence | blocked_dependency`
+  - Set `last_failure_reason` to a one-line description
+  - If signature matches previous, increment `same_failure_count`; otherwise reset to 1
 
 **Verification (recommended, not optional for branch+ risk):**
 - Check `git diff --stat` against expectations

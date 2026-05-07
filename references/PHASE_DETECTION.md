@@ -91,6 +91,7 @@ Action: use `harness-cache`, then `harness-context`
 
 For a given repository:
 
+0. **Check user intent for product discovery signals** (".pm/", "product idea", "worth building", "goal", "supervisor", "MVP", "UI direction", "I have an idea") — if detected, route to `harness-grill-product` or `harness-supervisor` regardless of whether `.harness/` exists. Product discovery does NOT require Harness to be installed.
 1. Check for `.harness/` and `AGENTS.md` -> if missing, No Harness
 2. **Check for PM/product signals** (".pm/", "product idea", "worth building", "goal", "supervisor") -> if `.pm/` exists, check state.yaml for phase; if `.pm/` missing and product keywords present, Product Discovery Phase
 3. **Check for debug signals** (bug keywords, error logs, stack traces, "fix", "broken", "not working") -> if present, Maintenance Debug Phase

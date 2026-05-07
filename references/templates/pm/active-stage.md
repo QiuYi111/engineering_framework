@@ -31,12 +31,32 @@ Without a clear product contract, engineering effort is wasted on the wrong thin
 
 ## Exit criteria
 
-- [ ] product.md complete
-- [ ] evidence.md passed or waived
-- [ ] ux-principles.md complete
-- [ ] user-journeys.md complete
-- [ ] ui-direction.md complete if required
-- [ ] All readiness flags true where applicable
+- [ ] EC-001: product.md complete
+  Evidence:
+  Blocking: true
+- [ ] EC-002: evidence.md passed or waived
+  Evidence:
+  Blocking: true
+- [ ] EC-003: ux-principles.md complete
+  Evidence:
+  Blocking: true
+- [ ] EC-004: user-journeys.md complete
+  Evidence:
+  Blocking: true
+- [ ] EC-005: ui-direction.md complete if required
+  Evidence:
+  Blocking: false
+- [ ] EC-006: All readiness flags true where applicable
+  Evidence:
+  Blocking: true
+
+## Stage exit evaluation
+
+After each accepted task, the Supervisor MUST evaluate current stage exit criteria:
+1. Check each EC item above. If `Evidence` is filled and `Blocking: true`, mark as satisfied.
+2. If ALL blocking exit criteria are satisfied: write `STAGE_EXIT_REACHED` to loop-control.
+3. If any blocking exit criteria remain unsatisfied: write `CONTINUE` to loop-control.
+4. Never mark a stage as complete without evidence for each blocking criterion.
 
 ## Current progress
 

@@ -41,6 +41,12 @@ At the start, ask the user:
 - "If you had no constraints, what would this become?"
 Keep Gates 3-7 for structural discipline (you still need to know who it's for and what it looks like).
 
+**Compressed mode**: For quick dogfood or when the user says "fast" / "quick pass":
+- Ask only 1-2 highest-value questions per gate
+- Generate v0 stable files immediately after all gates touched
+- Mark `ux_depth: light` and `evidence_status: weak` in state.yaml
+- User can re-run individual gates later to strengthen specific areas
+
 ## Gates
 
 | Gate | Goal | Output |
@@ -61,6 +67,6 @@ See `references/gate-questions.md` for full question lists, recommended answers,
 - `references/pushback-patterns.md` — Anti-sycophancy rules, pushback patterns, graduated escape hatch, gate execution rules
 - `references/cognitive-principles.md` — Inversion Reflex, Focus as Subtraction, Proxy Skepticism, Temporal Depth, Subtraction Default
 - `references/design-probe.md` — Design probe steps, coherence validation, subtraction check, block rule
-- Templates: `references/templates/pm/` — all .pm file templates
+- Templates: `references/templates/pm/` — all .pm file templates (repo-root relative)
 - Existing grill: `subskills/grill/QUESTION_TREE.md` — technical question tree (separate from this product grill)
 - `../../references/DOMAIN-AWARENESS.md` — project terminology
