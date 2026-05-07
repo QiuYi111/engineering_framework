@@ -40,3 +40,12 @@ Append-only log. Each supervisor iteration adds one entry.
 - Iteration valid count: 1
 - Iteration total count: 1
 - Next action: delegate next feasibility task
+
+## Supervisor Delegation 2
+
+- Date: 2026-05-07
+- Phase: waiting_for_worker
+- Branch: codex/dogfood
+- Summary: Wrote second bounded feasibility task to strengthen worker-report validation
+- Worker mode: sync OpenCode
+- Forbidden scope: pre-existing `scripts/harness_runtime/verify.py` change, `.pm/stable/*`, product boundary changes

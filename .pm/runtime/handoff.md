@@ -15,7 +15,7 @@ Product contract is frozen. Harness is in feasibility stage for dogfood-grade `/
 
 ## Next Expected Action
 
-Create the next bounded feasibility task, then delegate to OpenCode intern.
+Wait for OpenCode intern to complete `.pm/runtime/next-task.md`, then review `.pm/runtime/worker-report.md`.
 
 ## Important Constraints
 
@@ -25,6 +25,7 @@ Create the next bounded feasibility task, then delegate to OpenCode intern.
 - Existing modified file `scripts/harness_runtime/verify.py` predates this worker task and is forbidden scope.
 - Worker commit `6125f40` plus rework commit `07d4af8` are accepted as iteration 1.
 - The new `harness pm-status` command is available and should be used in future supervisor checks.
+- Current task strengthens deterministic worker-report validation.
 - No auto-merge, push, publish, or deploy.
 - Stop for core, infra, security, auth, payment, deployment, or product-boundary changes.
 
