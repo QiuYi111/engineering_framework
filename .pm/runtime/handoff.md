@@ -15,7 +15,7 @@ Product contract is frozen. Harness is in feasibility stage for dogfood-grade `/
 
 ## Next Expected Action
 
-Wait for OpenCode intern to complete `.pm/runtime/next-task.md`, then review `.pm/runtime/worker-report.md`.
+Stage exit reached. Await user confirmation before entering Stage 2 unbounded `/goal` dogfood.
 
 ## Important Constraints
 
@@ -35,6 +35,9 @@ Wait for OpenCode intern to complete `.pm/runtime/next-task.md`, then review `.p
 - Branch-policy mismatch is now visible in `pm-status` and blocks `pm-next`.
 - Next task should add deterministic resume-context support.
 - Current task adds read-only `pm-resume` context support.
+- Worker commit `b8aab4e` is accepted as iteration 5.
+- Bounded feasibility validation passed: 5 valid iterations out of 5.
+- `feasibility_ready: true`.
 - No auto-merge, push, publish, or deploy.
 - Stop for core, infra, security, auth, payment, deployment, or product-boundary changes.
 

@@ -2,23 +2,22 @@
 
 ## Task summary
 
-Add PM runtime branch-policy validation so `pm-status` and `pm-next` detect when the current git branch does not match the supervisor-managed goal branch and block delegation before worker execution.
+Add deterministic PM resume-context support so an interrupted supervisor loop can recover from `.pm/runtime` artifacts without guessing. Implemented `get_resume_context()` helper, `harness pm-resume` CLI command, and 10 tests.
 
 ## What was done
 
 - **Modified**: `scripts/harness_runtime/pm_runtime.py`
-  - Added `validate_branch_policy(project_root: Path) -> dict`: compares `inspect_git()` branch with `state.git.current_goal_branch`
-  - Returns status `ok` (match or no goal branch set), `mismatch` (wrong branch), or `unknown` (git error)
-  - Exposed `branch_policy` in `get_pm_status()` output dict
-  - Updated `decide_next_action()` to check branch policy early and return `request_user_decision` on mismatch, before loop-control and delegation logic
+  - Added `_parse_loop_log_entries(loop_log_path)`: splits loop-log.md into per-`##` heading entry strings, skipping the top-level `# Loop Log` title
+  - Added `get_resume_context(project_root, log_entries=3) -> dict`: read-only helper that collects stage, phase, loop iteration, loop-control directive, `decide_next_action()` result, handoff text, last N loop-log entries, branch-policy status, and worker-report status
+  - Missing files (handoff, loop-log, state.yaml) return None or empty values instead of raising
 
 - **Modified**: `scripts/harness_runtime/cli.py`
-  - Updated `harness pm-status` to display branch-policy status with icon (✅/❌/⚠️), current branch, expected branch, and reason
+  - Added `harness pm-resume --project ... --log-entries N` CLI command
+  - Concise read-only output: stage, phase, iteration, loop-control, next-action, branch-policy, worker-report, handoff preview, recent log entries
 
 - **Modified**: `tests/test_pm_runtime.py`
-  - Added `TestValidateBranchPolicy` class with 6 tests: matching branch, mismatched branch, no goal branch, git error, branch_policy in get_pm_status, branch match allows normal flow
-  - Added 4 branch-policy tests in `TestDecideNextAction`: mismatch returns request_user_decision, match allows delegate, missing goal branch does not block
-  - Total tests: 47 (was 39, net +8)
+  - Added `TestGetResumeContext` class with 10 tests
+  - Total tests: 57 (was 47, net +10)
 
 ## Changed files
 
@@ -29,57 +28,74 @@ Add PM runtime branch-policy validation so `pm-status` and `pm-next` detect when
 ## Commands run
 
 ```
-$ uv run harness pm-status --project /Users/qiujingyi.7/Harness
-=== PM Runtime Status ===
-Structure: OK
+$ uv run harness pm-resume --project /Users/qiujingyi.7/Harness
+=== PM Resume Context ===
 Stage: feasibility
 Phase: waiting_for_worker
-Loop iteration: 3
-...
-Branch policy: ✅ ok
+Loop iteration: 4
+Loop control: CONTINUE (valid — supervisor should continue delegating)
+Next action: review
+Reason: worker_report_valid_ready_for_review
+  - phase=waiting_for_worker, report=valid
+Branch policy: ok
   Current: codex/dogfood
   Expected: codex/dogfood
-  on expected branch 'codex/dogfood'
+Worker report: valid — 10 section(s) found
+Handoff (43 lines):
+  # Handoff
+  ...
+Recent log entries (3):
+  ## Supervisor Delegation 4
+  ## Supervisor Review 4
+  ## Supervisor Delegation 5
+
+$ uv run harness pm-status --project /Users/qiujingyi.7/Harness
 ✅ PM runtime state is valid.
+Branch policy: ✅ ok
 
 $ uv run harness pm-next --project /Users/qiujingyi.7/Harness
-=== PM Next Action ===
 Action: review
 Reason: worker_report_valid_ready_for_review
-Details:
-  - phase=waiting_for_worker, report=valid
 
 $ uv run python -m unittest discover -s tests
-Ran 47 tests in 0.577s
+Ran 57 tests in 0.619s
 OK
 
 $ uv run harness verify-ai --project /Users/qiujingyi.7/Harness
 47 passed, 0 failed, 1 warnings
 🎉 All required checks passed.
+
+$ git status --short
+ M scripts/harness_runtime/verify.py
+
+$ git log --oneline -1
+b8aab4e feat(pm-runtime): add deterministic pm-resume context helper
 ```
 
 ## Test results
 
-47 tests pass (was 39). 8 new tests added:
+57 tests pass (was 47). 10 new tests added:
 
-- `test_matching_branch_returns_ok`: on expected branch → status ok
-- `test_mismatched_branch_returns_mismatch`: wrong branch → status mismatch
-- `test_no_goal_branch_returns_ok`: no goal branch set → status ok (not enforced)
-- `test_git_error_returns_unknown`: git unavailable → status unknown
-- `test_branch_policy_in_get_pm_status`: branch_policy key present in status output
-- `test_branch_mismatch_returns_request_user_decision`: pm-next blocks on mismatch
-- `test_branch_match_allows_normal_flow`: pm-next delegates when on correct branch
-- `test_missing_goal_branch_does_not_block`: pm-next delegates when no goal branch
+- `test_includes_next_action_decision`: resume context includes decide_next_action() result
+- `test_last_n_loop_log_entries`: extracts exactly N most recent loop-log entries
+- `test_log_entries_default_three`: default is 3 entries
+- `test_missing_handoff_handled_gracefully`: None returned when handoff.md absent
+- `test_missing_loop_log_handled_gracefully`: empty list when loop-log.md absent
+- `test_includes_branch_policy`: branch_policy dict present in context
+- `test_includes_worker_report_status`: worker_report status present in context
+- `test_includes_stage_phase_iteration`: stage, phase, loop_iteration populated
+- `test_read_only_does_not_mutate_files`: all runtime files unchanged after get_resume_context()
+- `test_missing_state_handled_gracefully`: stage/phase None when state.yaml absent
 
 ## Acceptance criteria
 
-- [x] Branch mismatch is visible in `harness pm-status`
-- [x] Branch mismatch causes `harness pm-next` to avoid `delegate` and `review`
-- [x] Matching branch allows normal decision flow
-- [x] Missing expected goal branch does not block
-- [x] `uv run python -m unittest discover -s tests` passes (47/47)
+- [x] `harness pm-resume --project /Users/qiujingyi.7/Harness` runs and summarizes current resume context
+- [x] Resume context includes current phase, loop iteration, loop-control, branch-policy status, worker-report status, and `pm-next` decision
+- [x] Last N loop-log entries are extracted deterministically
+- [x] Missing handoff or loop-log does not crash the helper
+- [x] `uv run python -m unittest discover -s tests` passes (57/57)
 - [x] `uv run harness verify-ai --project /Users/qiujingyi.7/Harness` still passes (47/0/1)
-- [x] A clear git commit for this task only (verify.py excluded)
+- [x] A clear git commit is created for this task only (commit `b8aab4e`, verify.py excluded)
 
 ## Problems encountered
 
@@ -87,11 +103,13 @@ None.
 
 ## Deviations
 
-None. All changes stayed within allowed scope (`pm_runtime.py`, `cli.py`, `test_pm_runtime.py`). `verify.py` was not touched. `.pm/stable/*` was not modified. No git branch mutation, auto-merge, auto-push, deployment, auth, payment, or security features were implemented.
+None. All changes stayed within allowed scope (`pm_runtime.py`, `cli.py`, `test_pm_runtime.py`). `verify.py` was not touched. `.pm/stable/*` was not modified. No autonomous loop execution, worker execution, background daemon, queueing, auto-merge, auto-push, deployment, auth, payment, or security features were implemented.
 
 ## Evidence
 
-- Branch: `codex/dogfood` (verified on correct branch before commit)
-- `pm-status` shows `Branch policy: ✅ ok` with current=expected=`codex/dogfood`
-- `pm-next` returns `review` (normal flow, not blocked)
+- Branch: `codex/dogfood` (verified correct branch, branch-policy status ok)
+- Commit: `b8aab4e` on `codex/dogfood`
+- `pm-resume` shows complete resume context with all required fields
+- `pm-status` shows valid state with branch policy ok
+- `pm-next` returns review (normal flow)
 - Pre-existing dirty file `verify.py` intentionally excluded from commit
