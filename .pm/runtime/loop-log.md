@@ -92,3 +92,15 @@ Append-only log. Each supervisor iteration adds one entry.
 - Summary: Wrote fourth bounded feasibility task for read-only branch-policy validation
 - Worker mode: sync OpenCode
 - Forbidden scope: pre-existing `scripts/harness_runtime/verify.py` change, `.pm/stable/*`, product boundary changes, git branch mutation
+
+## Supervisor Review 4
+
+- Date: 2026-05-07
+- Phase: ready_to_delegate
+- Worker commit: df9f58e
+- Verdict: accepted
+- Evidence: pm-status passed with branch policy ok, pm-next passed, unittest 47/47 passed, verify-ai passed, mismatch simulation blocked
+- Accepted result: branch-policy validation is available in `pm-status` and `pm-next`
+- Iteration valid count: 4
+- Iteration total count: 4
+- Next action: delegate resume-context support task
