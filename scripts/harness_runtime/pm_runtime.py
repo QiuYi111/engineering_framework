@@ -606,6 +606,90 @@ def get_resume_context(project_root: Path, log_entries: int = 3) -> dict:
     }
 
 
+def get_loop_summary(project_root: Path) -> dict:
+    """Read-only loop run summary for supervisor audit."""
+    loop_log_path = project_root / ".pm" / "runtime" / "loop-log.md"
+    entries = _parse_loop_log_entries(loop_log_path)
+
+    total_iterations = 0
+    total_reworks = 0
+    last_commit = None
+    delivered = []
+    blockers = 0
+    dates = []
+
+    for entry in entries:
+        lines = entry.splitlines()
+        entry_text = "\n".join(lines)
+
+        if "- Verdict: accepted" in entry_text:
+            total_iterations += 1
+            for line in lines:
+                stripped = line.strip()
+                if stripped.startswith("- Accepted result:"):
+                    summary = stripped[len("- Accepted result:"):].strip()[:120]
+                    delivered.append(summary)
+                    break
+
+        if "- Phase: needs_rework" in entry_text:
+            total_reworks += 1
+
+        if "Phase: blocked" in entry_text or "action: blocked" in entry_text:
+            blockers += 1
+
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("- Worker commit:") or stripped.startswith("- Worker commits:"):
+                commit_part = stripped.split(":", 1)[1].strip()
+                commits = [c.strip().rstrip(",") for c in commit_part.split(",") if c.strip()]
+                if commits:
+                    last_commit = commits[-1]
+            if stripped.startswith("- Date:"):
+                date_val = stripped[len("- Date:"):].strip()
+                if date_val:
+                    dates.append(date_val)
+
+    valid_rate = None
+    consecutive_failures = 0
+    stage = None
+    iteration_valid_count = 0
+    iteration_total_count = 0
+
+    try:
+        state = parse_state_yaml(project_root)
+        raw = state.get("raw", {})
+        iteration_valid_count = raw.get("raw", {}).get("iteration_valid_count") or 0
+        iteration_total_count = raw.get("raw", {}).get("iteration_total_count") or 0
+        if iteration_total_count > 0:
+            valid_rate = round(iteration_valid_count / iteration_total_count, 2)
+        consecutive_failures = raw.get("consecutive_failures") or 0
+        stage = state.get("stage")
+    except (FileNotFoundError, ValueError):
+        pass
+
+    duration_note = ""
+    if dates:
+        unique = list(dict.fromkeys(dates))
+        if len(unique) == 1:
+            duration_note = unique[0]
+        else:
+            duration_note = f"{unique[0]} → {unique[-1]}"
+
+    return {
+        "total_iterations": total_iterations,
+        "total_reworks": total_reworks,
+        "valid_rate": valid_rate,
+        "iteration_valid_count": iteration_valid_count,
+        "iteration_total_count": iteration_total_count,
+        "consecutive_failures": consecutive_failures,
+        "stage": stage,
+        "last_commit": last_commit,
+        "duration_note": duration_note,
+        "delivered": delivered,
+        "blockers": blockers,
+    }
+
+
 def get_pm_status(project_root: Path) -> dict:
     """Collect full PM runtime status for a project.
 

@@ -8,6 +8,7 @@ from scripts.harness_runtime.pm_runtime import (
     classify_loop_control,
     decide_next_action,
     get_branch_correction_plan,
+    get_loop_summary,
     get_pm_status,
     get_resume_context,
     inspect_git,
@@ -1223,6 +1224,159 @@ class TestGetBranchCorrectionPlan(unittest.TestCase):
                 p = root / rel
                 current = p.read_text() if p.exists() else None
                 self.assertEqual(current, original, f"{rel} was mutated")
+
+
+class TestGetLoopSummary(unittest.TestCase):
+    def _make_project(self, tmp: str, *,
+                      loop_log: str | None = None,
+                      state_yaml: str | None = None) -> Path:
+        root = Path(tmp)
+        files = {}
+        for name in [
+            "product.md", "roadmap.md", "architecture-guardrails.md", "acceptance-rubric.md"
+        ]:
+            files[f".pm/stable/{name}"] = "content"
+        if state_yaml is not None:
+            files[".pm/runtime/state.yaml"] = state_yaml
+        files[".pm/runtime/active-stage.md"] = "stage"
+        files[".pm/runtime/handoff.md"] = "handoff"
+        files[".pm/runtime/loop-control"] = "CONTINUE"
+        files[".pm/runtime/next-task.md"] = "task"
+        if loop_log is not None:
+            files[".pm/runtime/loop-log.md"] = loop_log
+        _write_tree(root, files)
+        return root
+
+    def test_empty_log_returns_zeros(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp)
+            result = get_loop_summary(root)
+            self.assertEqual(result["total_iterations"], 0)
+            self.assertEqual(result["total_reworks"], 0)
+            self.assertEqual(result["delivered"], [])
+            self.assertEqual(result["blockers"], 0)
+            self.assertIsNone(result["valid_rate"])
+            self.assertIsNone(result["last_commit"])
+
+    def test_single_accepted_iteration(self):
+        import tempfile
+
+        loop_log = textwrap.dedent("""\
+            # Loop Log
+
+            ## Iteration 1
+
+            - Date: 2026-05-07
+            - Phase: waiting_for_worker
+            - Verdict: accepted
+            - Accepted result: Implemented feature X
+        """)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, loop_log=loop_log)
+            result = get_loop_summary(root)
+            self.assertEqual(result["total_iterations"], 1)
+            self.assertEqual(len(result["delivered"]), 1)
+            self.assertIn("Implemented feature X", result["delivered"][0])
+
+    def test_rework_counted(self):
+        import tempfile
+
+        loop_log = textwrap.dedent("""\
+            # Loop Log
+
+            ## Iteration 1
+
+            - Date: 2026-05-07
+            - Phase: needs_rework
+            - Summary: Worker report was incomplete.
+        """)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, loop_log=loop_log)
+            result = get_loop_summary(root)
+            self.assertEqual(result["total_reworks"], 1)
+
+    def test_valid_rate_from_state(self):
+        import tempfile
+
+        state_yaml = textwrap.dedent("""\
+            project_id: "test"
+            current_stage: "feasibility"
+            current_phase: "ready_to_delegate"
+            loop_iteration: 1
+            readiness: {}
+            worker: {engine: opencode, role: intern, mode: sync}
+            git: {branch_policy: supervisor_managed, current_goal_branch: "b", auto_merge: false, auto_push: false}
+            next_action: {type: delegate, summary: x, blocked: false, needs_user_decision: false}
+            failure_tracking: {}
+            raw:
+              iteration_valid_count: 5
+              iteration_total_count: 5
+        """)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, state_yaml=state_yaml)
+            result = get_loop_summary(root)
+            self.assertEqual(result["valid_rate"], 1.0)
+            self.assertEqual(result["iteration_valid_count"], 5)
+            self.assertEqual(result["iteration_total_count"], 5)
+
+    def test_dates_extracted(self):
+        import tempfile
+
+        loop_log = textwrap.dedent("""\
+            # Loop Log
+
+            ## Iteration 1
+
+            - Date: 2026-05-06
+            - Phase: waiting_for_worker
+
+            ## Iteration 2
+
+            - Date: 2026-05-07
+            - Phase: ready_to_delegate
+        """)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, loop_log=loop_log)
+            result = get_loop_summary(root)
+            self.assertIn("→", result["duration_note"])
+            self.assertIn("2026-05-06", result["duration_note"])
+            self.assertIn("2026-05-07", result["duration_note"])
+
+    def test_last_commit_extracted(self):
+        import tempfile
+
+        loop_log = textwrap.dedent("""\
+            # Loop Log
+
+            ## Iteration 1
+
+            - Date: 2026-05-07
+            - Worker commit: abc1234
+            - Phase: waiting_for_worker
+        """)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, loop_log=loop_log)
+            result = get_loop_summary(root)
+            self.assertEqual(result["last_commit"], "abc1234")
+
+    def test_blockers_counted(self):
+        import tempfile
+
+        loop_log = textwrap.dedent("""\
+            # Loop Log
+
+            ## Iteration 1
+
+            - Date: 2026-05-07
+            - Phase: blocked
+            - Summary: Waiting for user input.
+        """)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, loop_log=loop_log)
+            result = get_loop_summary(root)
+            self.assertEqual(result["blockers"], 1)
 
 
 if __name__ == "__main__":
