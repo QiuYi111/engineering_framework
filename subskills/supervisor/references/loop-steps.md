@@ -136,9 +136,9 @@ Read `.pm/runtime/worker-report.md`.
 - If `harness eval` was run by Intern, read its output and verify the claims
 - If `harness report` was generated, include its summary in the acceptance review
 - **Independent review via `/harness review`**: For branch+ risk or when worker claims are material (e.g., "all tests pass", "no forbidden scope touched"), run an independent OpenCode review agent:
-  ```bash
-  opencode run "/review Review the diff on the current branch for safety, scope compliance, and evidence quality." --file .pm/runtime/next-task.md
-  ```
+   ```bash
+   opencode run "/harness review Review the diff on the current branch for safety, scope compliance, and evidence quality." --file .pm/runtime/next-task.md
+   ```
 - **Parallel independent reviewers**: When the review questions are separable (e.g., scope compliance vs test coverage vs security), spawn multiple independent review agents in parallel rather than sequential reviews. Each agent should focus on one concern and produce a focused verdict.
 
 **If report is accepted:**

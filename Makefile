@@ -18,4 +18,4 @@ pm-next: ## Print the deterministic next-action decision for the supervisor
 pm-resume: ## Summarize current resume context for an interrupted loop
 	uv run harness pm-resume
 
-verify: verify-ai pm-status ## Run all verification checks (verify-ai + pm-status)
+verify: test verify-ai pm-status ## Run all verification checks (test + verify-ai + pm-status)

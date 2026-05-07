@@ -101,6 +101,36 @@ None.
 
 None. All changes stayed within allowed scope. Forbidden files (`verify.py`, `opencode-cli/SKILL.md`, `opencode-cli/references/patterns.md`) were not modified. No `.pm/stable/*` files were touched.
 
+## Rework (supervisor review findings)
+
+Two issues were identified by the supervisor review:
+
+### Fix 1: `/review` → `/harness review` in loop-steps.md
+
+**File**: `subskills/supervisor/references/loop-steps.md` line 140
+
+**Problem**: The code block under "Independent review via `/harness review`" used `opencode run "/review ..."` instead of `opencode run "/harness review ..."`. This contradicts the decision recorded in `.pm/decisions.md` (which says `/harness review`) and the task requirement.
+
+**Fix**: Changed `/review` to `/harness review` in the code block.
+
+### Fix 2: Makefile `verify` target missing `test`
+
+**File**: `Makefile` line 21
+
+**Problem**: The `verify` target depended only on `verify-ai pm-status`, but the task requirement and the decisions say verify should be a real project gate including tests.
+
+**Fix**: Added `test` as a dependency: `verify: test verify-ai pm-status`.
+
+### Rework verification
+
+- `make test` → 57 passed
+- `make verify-ai` → 47/0/1
+- `make pm-status` → valid
+- `make verify` → all three pass (test + verify-ai + pm-status)
+- Forbidden files unchanged (pre-existing diffs only)
+- `.pm/decisions.md` not modified (decisions already correct)
+- `.pm/stable/*` not touched
+
 ## Evidence
 
 - Branch: `codex/dogfood` (branch-policy ok)
@@ -108,3 +138,4 @@ None. All changes stayed within allowed scope. Forbidden files (`verify.py`, `op
 - 57/57 tests pass
 - `harness verify-ai` passes (47/0/1)
 - Forbidden files show pre-existing diffs only, none staged
+- Rework commit created separately from original task commit
