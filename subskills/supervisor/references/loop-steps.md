@@ -89,19 +89,46 @@ If action is `delegate` or `feasibility_spike`, write `.pm/runtime/next-task.md`
 
 Read `.pm/runtime/worker-config.yaml` for execution mode. Default is `manual` if file is missing.
 
-For exact CLI syntax, see `subskills/opencode-cli/SKILL.md` and `subskills/opencode-cli/references/patterns.md`.
+### Delegation routing by supervisor environment
+
+The supervisor must detect its runtime environment and choose the correct delegation method:
+
+**If supervisor is OpenCode** (you have the `Task` tool available):
+- Use the **Task tool** directly with `subagent_type: "general"`.
+- This is the ONLY correct delegation method when running inside OpenCode.
+- Do NOT use `opencode run` — it will fail with "Session not found" because you are already inside an opencode session.
+- Example:
+  ```
+  Task(
+    subagent_type="general",
+    description="Execute harness-intern task",
+    prompt="Read .pm/runtime/next-task.md at /path/to/project and execute it exactly. ... [full task instructions] ... Return make test output, make verify output, and git log."
+  )
+  ```
+
+**If supervisor is Codex or Claude Code** (no Task tool, or `opencode` CLI available externally):
+- Use the **opencode CLI** via shell execution.
+- The canonical method is `opencode serve` for persistent delegation, or `opencode run` for one-shot:
+  ```bash
+  opencode run "/harness-intern Read and execute .pm/runtime/next-task.md exactly. Write .pm/runtime/worker-report.md and create one git commit for your task changes only." --file .pm/runtime/next-task.md
+  ```
+- For exact CLI syntax, see `subskills/opencode-cli/SKILL.md` and `subskills/opencode-cli/references/patterns.md`.
+
+### Execution modes
 
 **manual mode** — Write `.pm/runtime/next-task.md`, then set `current_phase: worker_running` in state.yaml and STOP. The worker is triggered separately. Supervisor will check for the report on the next iteration.
 
-**sync mode** — Execute the worker via the `/harness-intern` slash command (the canonical delegation method):
-```bash
-opencode run "/harness-intern Read and execute .pm/runtime/next-task.md exactly. Write .pm/runtime/worker-report.md and create one git commit for your task changes only." --file .pm/runtime/next-task.md
-```
-This uses the `harness-intern` skill through the OpenCode CLI slash-command interface. Do NOT use `--agent harness-intern` or natural-language role-play like "Act as harness-intern" — the slash command ensures the full skill definition is loaded with correct routing and guardrails.
+**sync mode (OpenCode)** — Delegate via Task tool with `subagent_type: "general"`. Write the full task instructions in the prompt. Wait for the task result. On failure, fall back to manual mode.
+
+**sync mode (Codex/Claude Code)** — Execute the worker via the `/harness-intern` slash command using `opencode run`. On failure, fall back to manual mode.
 
 **poll mode** — Write task, set `current_phase: worker_running`. On next iteration, check for worker-report.md. If `timeout_minutes` exceeded, set `NEEDS_USER_DECISION` in loop-control.
 
-**Fallback** — if the slash-command invocation fails, treat as manual mode.
+### Fallback chain
+
+1. Primary delegation method (Task tool or opencode CLI, based on environment)
+2. If primary fails → manual mode (write task, stop, wait for external trigger)
+3. Do NOT implement code directly — this is a protocol violation.
 
 **Critical**: Do NOT assume the worker succeeded. Wait for `.pm/runtime/worker-report.md` to exist and be updated.
 
