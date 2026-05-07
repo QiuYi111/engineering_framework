@@ -6,7 +6,7 @@ worker:
   engine: opencode
   role: intern
   mode: manual  # manual | sync | poll
-  command: "opencode run --agent harness-intern --file .pm/runtime/next-task.md"
+  command: "opencode run \"/harness-intern Read and execute .pm/runtime/next-task.md exactly. Write .pm/runtime/worker-report.md and create one git commit for your task changes only.\" --file .pm/runtime/next-task.md"
   report_path: ".pm/runtime/worker-report.md"
   timeout_minutes: 30
 

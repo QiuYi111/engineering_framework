@@ -93,18 +93,15 @@ For exact CLI syntax, see `subskills/opencode-cli/SKILL.md` and `subskills/openc
 
 **manual mode** — Write `.pm/runtime/next-task.md`, then set `current_phase: worker_running` in state.yaml and STOP. The worker is triggered separately. Supervisor will check for the report on the next iteration.
 
-**sync mode** — Execute the worker in the current session:
-```
-Load harness-intern skill, instruct: "Read and execute .pm/runtime/next-task.md"
-```
-Or using OpenCode CLI (see `subskills/opencode-cli/SKILL.md`):
+**sync mode** — Execute the worker via the `/harness-intern` slash command (the canonical delegation method):
 ```bash
-opencode run --agent harness-intern -f .pm/runtime/next-task.md
+opencode run "/harness-intern Read and execute .pm/runtime/next-task.md exactly. Write .pm/runtime/worker-report.md and create one git commit for your task changes only." --file .pm/runtime/next-task.md
 ```
+This uses the `harness-intern` skill through the OpenCode CLI slash-command interface. Do NOT use `--agent harness-intern` or natural-language role-play like "Act as harness-intern" — the slash command ensures the full skill definition is loaded with correct routing and guardrails.
 
 **poll mode** — Write task, set `current_phase: worker_running`. On next iteration, check for worker-report.md. If `timeout_minutes` exceeded, set `NEEDS_USER_DECISION` in loop-control.
 
-**Fallback** — if neither sync method works, treat as manual mode.
+**Fallback** — if the slash-command invocation fails, treat as manual mode.
 
 **Critical**: Do NOT assume the worker succeeded. Wait for `.pm/runtime/worker-report.md` to exist and be updated.
 
@@ -131,13 +128,18 @@ Read `.pm/runtime/worker-report.md`.
   - Set `last_failure_reason` to a one-line description
   - If signature matches previous, increment `same_failure_count`; otherwise reset to 1
 
-**Verification (recommended, not optional for branch+ risk):**
+**Verification (required for branch+ risk or when worker claims are material; recommended otherwise):**
 - Check `git diff --stat` against expectations
 - Run `harness eval` if applicable — the Intern should have run this, but verify independently
 - Run `harness context <feature-id>` to generate minimal context if the task touched multiple files
 - Verify no forbidden scope was touched via `git diff` against allowed scope
 - If `harness eval` was run by Intern, read its output and verify the claims
 - If `harness report` was generated, include its summary in the acceptance review
+- **Independent review via `/harness review`**: For branch+ risk or when worker claims are material (e.g., "all tests pass", "no forbidden scope touched"), run an independent OpenCode review agent:
+  ```bash
+  opencode run "/review Review the diff on the current branch for safety, scope compliance, and evidence quality." --file .pm/runtime/next-task.md
+  ```
+- **Parallel independent reviewers**: When the review questions are separable (e.g., scope compliance vs test coverage vs security), spawn multiple independent review agents in parallel rather than sequential reviews. Each agent should focus on one concern and produce a focused verdict.
 
 **If report is accepted:**
 - **Reset `consecutive_failures` to 0** in state.yaml
