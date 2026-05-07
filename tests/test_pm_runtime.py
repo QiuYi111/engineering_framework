@@ -10,6 +10,7 @@ from scripts.harness_runtime.pm_runtime import (
     get_pm_status,
     inspect_git,
     parse_state_yaml,
+    validate_branch_policy,
     validate_pm_structure,
     validate_worker_report,
 )
@@ -684,6 +685,158 @@ class TestDecideNextAction(unittest.TestCase):
             result = decide_next_action(root)
             self.assertEqual(result["action"], "delegate")
             self.assertEqual(result["reason"], "ready_to_delegate")
+
+    def test_branch_mismatch_returns_request_user_decision(self):
+        import tempfile
+        from unittest.mock import patch
+
+        state = self._BASE_STATE.replace(
+            'current_goal_branch: "b"',
+            'current_goal_branch: "codex/dogfood"',
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, state_yaml=state)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "main", "dirty_files": [], "error": None}):
+                result = decide_next_action(root)
+            self.assertEqual(result["action"], "request_user_decision")
+            self.assertEqual(result["reason"], "branch_policy_mismatch")
+
+    def test_branch_match_allows_normal_flow(self):
+        import tempfile
+        from unittest.mock import patch
+
+        state = self._BASE_STATE.replace(
+            'current_goal_branch: "b"',
+            'current_goal_branch: "codex/dogfood"',
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, state_yaml=state)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "codex/dogfood", "dirty_files": [], "error": None}):
+                result = decide_next_action(root)
+            self.assertEqual(result["action"], "delegate")
+            self.assertEqual(result["reason"], "ready_to_delegate")
+
+    def test_missing_goal_branch_does_not_block(self):
+        import tempfile
+        from unittest.mock import patch
+
+        state = self._BASE_STATE.replace(
+            'current_goal_branch: "b"',
+            'current_goal_branch: null',
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, state_yaml=state)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "main", "dirty_files": [], "error": None}):
+                result = decide_next_action(root)
+            self.assertEqual(result["action"], "delegate")
+            self.assertEqual(result["reason"], "ready_to_delegate")
+
+
+class TestValidateBranchPolicy(unittest.TestCase):
+    _STATE_WITH_GOAL = textwrap.dedent("""\
+        project_id: "test"
+        current_stage: "feasibility"
+        current_phase: "ready_to_delegate"
+        loop_iteration: 1
+        readiness: {}
+        worker: {engine: opencode, role: intern, mode: sync}
+        git: {branch_policy: supervisor_managed, current_goal_branch: "codex/dogfood", auto_merge: false, auto_push: false}
+        next_action: {type: delegate, summary: x, blocked: false, needs_user_decision: false}
+        failure_tracking: {}
+    """)
+
+    _STATE_NO_GOAL = textwrap.dedent("""\
+        project_id: "test"
+        current_stage: "feasibility"
+        current_phase: "ready_to_delegate"
+        loop_iteration: 1
+        readiness: {}
+        worker: {engine: opencode, role: intern, mode: sync}
+        git: {branch_policy: supervisor_managed, auto_merge: false, auto_push: false}
+        next_action: {type: delegate, summary: x, blocked: false, needs_user_decision: false}
+        failure_tracking: {}
+    """)
+
+    def _make_state_project(self, tmp: str, state_yaml: str) -> Path:
+        root = Path(tmp)
+        files = {}
+        for name in [
+            "product.md", "roadmap.md", "architecture-guardrails.md", "acceptance-rubric.md"
+        ]:
+            files[f".pm/stable/{name}"] = "content"
+        files[".pm/runtime/state.yaml"] = state_yaml
+        files[".pm/runtime/active-stage.md"] = "stage"
+        files[".pm/runtime/handoff.md"] = "handoff"
+        files[".pm/runtime/loop-control"] = "CONTINUE"
+        files[".pm/runtime/next-task.md"] = "task"
+        _write_tree(root, files)
+        return root
+
+    def test_matching_branch_returns_ok(self):
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_state_project(tmp, self._STATE_WITH_GOAL)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "codex/dogfood", "dirty_files": [], "error": None}):
+                result = validate_branch_policy(root)
+            self.assertEqual(result["status"], "ok")
+            self.assertEqual(result["current_branch"], "codex/dogfood")
+            self.assertEqual(result["expected_branch"], "codex/dogfood")
+
+    def test_mismatched_branch_returns_mismatch(self):
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_state_project(tmp, self._STATE_WITH_GOAL)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "main", "dirty_files": [], "error": None}):
+                result = validate_branch_policy(root)
+            self.assertEqual(result["status"], "mismatch")
+            self.assertEqual(result["current_branch"], "main")
+            self.assertEqual(result["expected_branch"], "codex/dogfood")
+            self.assertIn("main", result["reason"])
+            self.assertIn("codex/dogfood", result["reason"])
+
+    def test_no_goal_branch_returns_ok(self):
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_state_project(tmp, self._STATE_NO_GOAL)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "main", "dirty_files": [], "error": None}):
+                result = validate_branch_policy(root)
+            self.assertEqual(result["status"], "ok")
+            self.assertIn("no goal branch", result["reason"])
+
+    def test_git_error_returns_unknown(self):
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_state_project(tmp, self._STATE_WITH_GOAL)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": None, "dirty_files": [], "error": "not a git repo"}):
+                result = validate_branch_policy(root)
+            self.assertEqual(result["status"], "unknown")
+
+    def test_branch_policy_in_get_pm_status(self):
+        import tempfile
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_state_project(tmp, self._STATE_WITH_GOAL)
+            with patch("scripts.harness_runtime.pm_runtime.inspect_git",
+                       return_value={"branch": "codex/dogfood", "dirty_files": [], "error": None}):
+                status = get_pm_status(root)
+            self.assertIn("branch_policy", status)
+            self.assertEqual(status["branch_policy"]["status"], "ok")
 
 
 if __name__ == "__main__":

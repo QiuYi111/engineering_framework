@@ -504,6 +504,16 @@ def pm_status(project):
     if git["error"]:
         click.echo(f"Git error: {git['error']}")
 
+    bp = status.get("branch_policy", {})
+    bp_status = bp.get("status", "unknown")
+    bp_icon = {"ok": "✅", "mismatch": "❌", "unknown": "⚠️ "}.get(bp_status, "?")
+    click.echo(f"\nBranch policy: {bp_icon} {bp_status}")
+    if bp.get("current_branch") is not None:
+        click.echo(f"  Current: {bp['current_branch']}")
+    if bp.get("expected_branch") is not None:
+        click.echo(f"  Expected: {bp['expected_branch']}")
+    click.echo(f"  {bp.get('reason', '')}")
+
     if not status["ok"]:
         click.echo("\n🚨 PM runtime state is invalid or incomplete.")
         raise SystemExit(1)

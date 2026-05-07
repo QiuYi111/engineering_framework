@@ -237,6 +237,59 @@ def inspect_git(project_root: Path) -> dict:
     return result
 
 
+def validate_branch_policy(project_root: Path) -> dict:
+    """Compare the current git branch with the supervisor-managed goal branch.
+
+    Read-only validation — never mutates git state.
+
+    Returns dict with:
+        status (str): one of 'ok', 'mismatch', 'unknown'
+        current_branch (str|None): the branch HEAD is on
+        expected_branch (str|None): the goal branch from state.yaml
+        reason (str): human-readable explanation
+    """
+    git = inspect_git(project_root)
+    current_branch = git.get("branch")
+
+    expected_branch = None
+    try:
+        state = parse_state_yaml(project_root)
+        expected_branch = state.get("git_policy", {}).get("goal_branch")
+    except (FileNotFoundError, ValueError):
+        pass
+
+    if not expected_branch:
+        return {
+            "status": "ok",
+            "current_branch": current_branch,
+            "expected_branch": expected_branch,
+            "reason": "no goal branch set, branch policy not enforced",
+        }
+
+    if git.get("error") or current_branch is None:
+        return {
+            "status": "unknown",
+            "current_branch": current_branch,
+            "expected_branch": expected_branch,
+            "reason": f"git error: {git.get('error', 'branch unavailable')}",
+        }
+
+    if current_branch == expected_branch:
+        return {
+            "status": "ok",
+            "current_branch": current_branch,
+            "expected_branch": expected_branch,
+            "reason": f"on expected branch '{expected_branch}'",
+        }
+
+    return {
+        "status": "mismatch",
+        "current_branch": current_branch,
+        "expected_branch": expected_branch,
+        "reason": f"on '{current_branch}' but expected '{expected_branch}'",
+    }
+
+
 def decide_next_action(project_root: Path) -> dict:
     """Deterministic read-only next-action decision helper for the supervisor.
 
@@ -262,6 +315,19 @@ def decide_next_action(project_root: Path) -> dict:
 
     state = status["state"]
     raw = state.get("raw", {})
+
+    # ── Branch policy mismatch ───────────────────────────────────────────
+    branch_policy = status.get("branch_policy", {})
+    if branch_policy.get("status") == "mismatch":
+        details.append(
+            f"current_branch={branch_policy['current_branch']}, "
+            f"expected_branch={branch_policy['expected_branch']}"
+        )
+        return {
+            "action": "request_user_decision",
+            "reason": "branch_policy_mismatch",
+            "details": details,
+        }
 
     # ── Loop-control directives ──────────────────────────────────────────
     loop = status["loop_control"]
@@ -340,6 +406,7 @@ def get_pm_status(project_root: Path) -> dict:
     loop = classify_loop_control(project_root)
     report = validate_worker_report(project_root)
     git = inspect_git(project_root)
+    branch_policy = validate_branch_policy(project_root)
 
     # ok = False only when required files are missing/invalid
     ok = structure["ok"] and state_error is None and loop["valid"]
@@ -352,4 +419,5 @@ def get_pm_status(project_root: Path) -> dict:
         "loop_control": loop,
         "worker_report": report,
         "git": git,
+        "branch_policy": branch_policy,
     }
