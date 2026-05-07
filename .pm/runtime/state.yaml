@@ -1,14 +1,14 @@
 project_id: "harness-dogfood-goal-loop"
 status: active
 
-current_stage: "feasibility"
-current_stage_goal: "Prove dogfood-grade /goal long-running supervisor loop"
-current_phase: "stage_exit_reached"
+current_stage: "delivery"
+current_stage_goal: "Use unbounded /goal dogfood to improve Harness itself"
+current_phase: "worker_running"
 loop_iteration: 5
 
 ui_direction_required: false
 
-max_iterations: 5
+max_iterations: null
 consecutive_failures: 0
 max_consecutive_failures: 3
 iteration_valid_count: 5
@@ -70,10 +70,10 @@ last_verified:
   harness_eval_result: unknown
 
 next_action:
-  type: "stop"
-  summary: "Stage 1 bounded feasibility validation passed: 5 valid iterations out of 5"
+  type: "delegate"
+  summary: "Harden supervisor delegation/review protocol from dogfood findings"
   blocked: false
-  needs_user_decision: true
+  needs_user_decision: false
 
-stop_reason: "Stage exit reached after bounded max_iterations=5 feasibility validation"
+stop_reason: null
 last_updated: "2026-05-07"
