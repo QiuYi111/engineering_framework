@@ -10,6 +10,7 @@ from .verify import run_full_verify, check_role_boundaries
 from .evals import run_eval
 from .context import build_context, format_context, write_context, build_context_cache_aware, format_context_cache_aware
 from .installer import install_skills
+from .pm_runtime import get_pm_status
 
 DIST_ROOT = Path(__file__).resolve().parent.parent.parent
 RESOURCES_DIR = DIST_ROOT / "references"
@@ -452,6 +453,60 @@ def cache_report(project):
     click.echo(f"  Project protocol: ~{project_total} tokens  (stable within project)")
     click.echo(f"  Combined stable:  ~{harness_total + project_total} tokens")
     click.echo(f"\nNote: token estimates are approximate (4 chars/token).")
+
+
+@main.command("pm-status")
+@click.option("--project", default=None, help="Project root (default: git root or cwd)")
+def pm_status(project):
+    """Show PM runtime health-check status."""
+    project_root = Path(project).resolve() if project else _git_root()
+    status = get_pm_status(project_root)
+
+    click.echo("=== PM Runtime Status ===\n")
+
+    click.echo(f"Structure: {'OK' if status['structure']['ok'] else 'INVALID'}")
+    if status["structure"]["missing"]:
+        click.echo(f"  Missing: {', '.join(status['structure']['missing'])}")
+    if status["structure"]["empty"]:
+        click.echo(f"  Empty: {', '.join(status['structure']['empty'])}")
+
+    if status["state_error"]:
+        click.echo(f"\nState: ERROR — {status['state_error']}")
+    else:
+        s = status["state"]
+        click.echo(f"\nStage: {s['stage']}")
+        click.echo(f"Phase: {s['phase']}")
+        click.echo(f"Loop iteration: {s['loop_iteration']}")
+        readiness = s["readiness"]
+        click.echo(f"Readiness: {', '.join(f'{k}={v}' for k, v in readiness.items())}")
+        click.echo(f"Worker: {s['worker']['engine']}/{s['worker']['role']}/{s['worker']['mode']}")
+        gp = s["git_policy"]
+        click.echo(f"Git: policy={gp['branch_policy']} branch={gp['goal_branch']} auto_merge={gp['auto_merge']} auto_push={gp['auto_push']}")
+        na = s["next_action"]
+        click.echo(f"Next: {na['type']} blocked={na['blocked']} needs_user={na['needs_user_decision']}")
+
+    lc = status["loop_control"]
+    click.echo(f"\nLoop control: {lc['directive'] or 'N/A'} ({'valid' if lc['valid'] else 'INVALID'} — {lc['reason']})")
+
+    wr = status["worker_report"]
+    click.echo(f"Worker report: {wr['status']} — {wr['reason']}")
+
+    git = status["git"]
+    click.echo(f"\nGit branch: {git['branch'] or 'N/A'}")
+    if git["dirty_files"]:
+        click.echo(f"Dirty files ({len(git['dirty_files'])}):")
+        for f in git["dirty_files"]:
+            click.echo(f"  {f}")
+    else:
+        click.echo("Dirty files: none")
+    if git["error"]:
+        click.echo(f"Git error: {git['error']}")
+
+    if not status["ok"]:
+        click.echo("\n🚨 PM runtime state is invalid or incomplete.")
+        raise SystemExit(1)
+    else:
+        click.echo("\n✅ PM runtime state is valid.")
 
 
 if __name__ == "__main__":
