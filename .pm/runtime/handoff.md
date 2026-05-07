@@ -15,13 +15,14 @@ Product contract is frozen. Harness is in feasibility stage for dogfood-grade `/
 
 ## Next Expected Action
 
-Create a bounded `next-task.md` for implementing the first executable supervisor loop runtime capability. The task should preserve user changes and respect the existing modified `scripts/harness_runtime/verify.py`.
+Wait for OpenCode intern to complete `.pm/runtime/next-task.md`, then review `.pm/runtime/worker-report.md`.
 
 ## Important Constraints
 
 - Do not overwrite user changes.
 - Supervisor manages branch policy.
 - Intern must create a clear commit for each accepted task.
+- Existing modified file `scripts/harness_runtime/verify.py` predates this worker task and is forbidden scope.
 - No auto-merge, push, publish, or deploy.
 - Stop for core, infra, security, auth, payment, deployment, or product-boundary changes.
 

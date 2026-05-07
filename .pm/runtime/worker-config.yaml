@@ -2,7 +2,7 @@ worker:
   engine: opencode
   role: intern
   mode: sync
-  command: "opencode run --agent harness-intern -f .pm/runtime/next-task.md"
+  command: "opencode run --agent build -f .pm/runtime/next-task.md 'Act as harness-intern. Read and execute the attached task packet exactly. Write .pm/runtime/worker-report.md and create one git commit for your task changes only.'"
   report_path: ".pm/runtime/worker-report.md"
   timeout_minutes: 30
 

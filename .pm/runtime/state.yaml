@@ -3,7 +3,7 @@ status: active
 
 current_stage: "feasibility"
 current_stage_goal: "Prove dogfood-grade /goal long-running supervisor loop"
-current_phase: "ready_to_delegate"
+current_phase: "waiting_for_worker"
 loop_iteration: 0
 
 ui_direction_required: false
@@ -54,11 +54,11 @@ worker:
   mode: sync
   current_task_file: .pm/runtime/next-task.md
   current_report_file: .pm/runtime/worker-report.md
-  last_run_id: null
+  last_run_id: "pending"
 
 git:
   branch_policy: supervisor_managed
-  current_goal_branch: null
+  current_goal_branch: "codex/dogfood"
   intern_commit_required: true
   auto_merge: false
   auto_push: false
@@ -71,7 +71,7 @@ last_verified:
 
 next_action:
   type: "delegate"
-  summary: "Build the first executable bounded /goal loop runtime for five-iteration dogfood validation"
+  summary: "Worker should implement the first deterministic PM runtime health-check slice"
   blocked: false
   needs_user_decision: false
 
