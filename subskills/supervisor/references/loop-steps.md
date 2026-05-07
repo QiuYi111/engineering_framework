@@ -89,15 +89,17 @@ If action is `delegate` or `feasibility_spike`, write `.pm/runtime/next-task.md`
 
 Read `.pm/runtime/worker-config.yaml` for execution mode. Default is `manual` if file is missing.
 
+For exact CLI syntax, see `subskills/opencode-cli/SKILL.md` and `subskills/opencode-cli/references/patterns.md`.
+
 **manual mode** — Write `.pm/runtime/next-task.md`, then set `current_phase: worker_running` in state.yaml and STOP. The worker is triggered separately. Supervisor will check for the report on the next iteration.
 
 **sync mode** — Execute the worker in the current session:
 ```
 Load harness-intern skill, instruct: "Read and execute .pm/runtime/next-task.md"
 ```
-Or if the agent system supports `--agent` syntax:
-```
-opencode run --agent harness-intern --file .pm/runtime/next-task.md
+Or using OpenCode CLI (see `subskills/opencode-cli/SKILL.md`):
+```bash
+opencode run --agent harness-intern -f .pm/runtime/next-task.md
 ```
 
 **poll mode** — Write task, set `current_phase: worker_running`. On next iteration, check for worker-report.md. If `timeout_minutes` exceeded, set `NEEDS_USER_DECISION` in loop-control.

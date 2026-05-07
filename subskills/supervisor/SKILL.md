@@ -42,4 +42,5 @@ See `references/safety-mechanisms.md` for iteration limits, consecutive failure 
 - Context: `subskills/context/SKILL.md` — minimal context bundle generation
 - Eval: `subskills/eval/SKILL.md` — implementation evaluation
 - Report: `subskills/report/SKILL.md` — implementation report generation
+- OpenCode CLI: `subskills/opencode-cli/SKILL.md` — CLI command reference for delegation
 - Domain: `../../references/DOMAIN-AWARENESS.md` — project terminology

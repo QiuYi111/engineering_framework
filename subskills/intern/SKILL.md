@@ -55,4 +55,5 @@ You are the engineering intern. You execute bounded tasks. You read the task pac
 - Debug: `subskills/debug/SKILL.md`
 - TDD: `subskills/tdd/SKILL.md`
 - Eval: `subskills/eval/SKILL.md`
+- OpenCode CLI: `subskills/opencode-cli/SKILL.md` — CLI command reference
 - Domain: `../../references/DOMAIN-AWARENESS.md`
