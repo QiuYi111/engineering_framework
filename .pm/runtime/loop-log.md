@@ -150,3 +150,26 @@ Append-only log. Each supervisor iteration adds one entry.
 - Iteration valid count: 6
 - Iteration total count: 6
 - Next action: continue Stage 2 dogfood with another bounded improvement task
+
+## Supervisor Delegation 7
+
+- Date: 2026-05-07
+- Phase: worker_running
+- Branch: codex/dogfood
+- Summary: Wrote bounded task for read-only branch correction plan helper to help supervisor recover from branch drift.
+- Worker mode: sync OpenCode via `/harness-intern`
+- PM ledger commit: 5f607d0
+- Forbidden scope: pre-existing `scripts/harness_runtime/verify.py`, `subskills/opencode-cli/SKILL.md`, `subskills/opencode-cli/references/patterns.md`, `.pm/stable/*`, git mutation commands
+
+## Supervisor Review 7
+
+- Date: 2026-05-07
+- Phase: ready_to_delegate
+- Worker commit: 659c499
+- Verdict: accepted
+- Evidence: 65/65 tests passed, pm-branch-plan correctly reports `manual_review_required` for diverged branches, make verify passed, worker report validator returned valid
+- Accepted result: read-only branch correction plan helper is available via `harness pm-branch-plan`
+- Branch note: `main` and `codex/dogfood` diverged post-task due to identical "update" commits on both branches; `pm-branch-plan` correctly detects this
+- Iteration valid count: 7
+- Iteration total count: 7
+- Next action: continue Stage 2 dogfood with next bounded improvement task
