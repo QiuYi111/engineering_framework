@@ -3,7 +3,7 @@ status: active
 
 current_stage: "delivery"
 current_stage_goal: "Use unbounded /goal dogfood to improve Harness itself"
-current_phase: "ready_to_delegate"
+current_phase: "worker_running"
 loop_iteration: 7
 
 ui_direction_required: false
@@ -71,9 +71,9 @@ last_verified:
 
 next_action:
   type: "delegate"
-  summary: "Select next bounded Harness improvement task for Stage 2 dogfood"
+  summary: "Delegate PM loop run summary helper"
   blocked: false
   needs_user_decision: false
 
 stop_reason: null
-last_updated: "2026-05-07"
+last_updated: "2026-05-07T09:00"

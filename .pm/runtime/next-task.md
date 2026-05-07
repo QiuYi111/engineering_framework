@@ -2,18 +2,16 @@
 
 ## Objective
 
-Add a read-only branch correction plan helper so supervisor can recover from branch drift without guessing or mutating git state.
+Add a read-only PM loop run summary helper (`get_loop_summary`) that produces a concise audit summary of the entire supervisor run from `loop-log.md` and `state.yaml`.
 
 ## Stage context
 
-Stage 2: Unbounded `/goal` Dogfood. Dogfood already exposed a real branch drift case: work landed on `main` while the goal branch was `codex/dogfood`. Branch-policy validation now blocks delegation, but it does not yet tell the supervisor whether safe correction is possible or what exact non-destructive command sequence should be used.
+Stage 2: Unbounded `/goal` Dogfood. The roadmap Stage 3 exit criteria require "the user can audit the full run from git and `.pm/runtime`." Currently, auditing requires manually reading `loop-log.md` (175 lines and growing). A structured summary command would make auditing instant.
 
 ## Read first
 
-- `.pm/stable/roadmap.md`
 - `.pm/runtime/state.yaml`
-- `.pm/runtime/active-stage.md`
-- `.pm/runtime/acceptance-review.md`
+- `.pm/runtime/loop-log.md`
 - `scripts/harness_runtime/pm_runtime.py`
 - `scripts/harness_runtime/cli.py`
 - `tests/test_pm_runtime.py`
@@ -21,25 +19,22 @@ Stage 2: Unbounded `/goal` Dogfood. Dogfood already exposed a real branch drift 
 
 ## Task
 
-Implement a read-only branch correction plan:
+Implement a read-only loop run summary:
 
-1. Add a helper in `scripts/harness_runtime/pm_runtime.py`, for example `get_branch_correction_plan(project_root: Path) -> dict`.
-2. The helper must never mutate git state. It should inspect:
-   - current branch
-   - expected goal branch from `.pm/runtime/state.yaml`
-   - whether the expected branch exists
-   - whether the expected branch is an ancestor of the current branch
-   - whether the current branch is an ancestor of the expected branch
-3. Return one of these statuses:
-   - `ok`: already on expected branch or no goal branch configured
-   - `safe_fast_forward_goal_branch`: current branch contains expected branch history, so supervisor may safely fast-forward the goal branch to current HEAD and switch back
-   - `safe_switch_to_goal_branch`: expected branch contains current branch history, so supervisor may safely switch to expected branch
-   - `manual_review_required`: branches diverged or git state cannot prove safe correction
-   - `unknown`: git/state inspection failed
-4. Include explicit `commands` suggestions for the safe cases, but do not execute them.
-5. Add CLI command `harness pm-branch-plan --project ...` that prints the plan clearly.
-6. Add a Makefile target `pm-branch-plan`.
-7. Add focused tests using mocks/subprocess patching. Do not require creating real git repositories unless that is simpler and deterministic.
+1. Add a helper in `scripts/harness_runtime/pm_runtime.py`, for example `get_loop_summary(project_root: Path) -> dict`.
+2. The helper must parse `loop-log.md` entries and `state.yaml` to produce:
+   - `total_iterations`: count of accepted iterations (entries with "Verdict: accepted")
+   - `total_reworks`: count of rework entries (entries with "Phase: needs_rework")
+   - `valid_rate`: ratio of `iteration_valid_count` / `iteration_total_count` from state.yaml
+   - `consecutive_failures`: current value from state.yaml
+   - `stage`: current stage from state.yaml
+   - `last_commit`: the most recent worker commit hash found in loop-log
+   - `duration_note`: first log entry date and last log entry date (e.g., "2026-05-07 → 2026-05-07")
+   - `delivered`: list of accepted iteration summaries — for each accepted review entry, extract the "Accepted result:" line (first 120 chars)
+   - `blockers`: count of entries with "Phase: blocked" or "action: blocked"
+3. Add CLI command `harness pm-summary --project ...` that prints the summary in a clear, formatted way (not raw JSON).
+4. Add a Makefile target `pm-summary`.
+5. Add focused tests. Use the existing `_parse_loop_log_entries` helper. Test with a small synthetic loop-log string written to a temp file, not the real one.
 
 ## Allowed scope
 
@@ -55,25 +50,26 @@ Implement a read-only branch correction plan:
 - `subskills/opencode-cli/SKILL.md` because it has pre-existing uncommitted changes outside this task
 - `subskills/opencode-cli/references/patterns.md` because it has pre-existing uncommitted changes outside this task
 - `.pm/stable/*`
-- Any command that mutates git state (`git switch`, `git branch -f`, `git merge`, `git reset`, `git checkout`, `git commit`, etc.) except the final task commit
+- Any command that mutates git state except the final task commit
 - Product positioning or MVP boundary changes
 
 ## Acceptance criteria
 
-- [ ] `get_branch_correction_plan()` is read-only and deterministic.
-- [ ] Current branch equals expected branch returns `ok`.
-- [ ] Missing goal branch returns `ok` with no commands.
-- [ ] Expected branch ancestor of current branch returns `safe_fast_forward_goal_branch` with suggested commands.
-- [ ] Current branch ancestor of expected branch returns `safe_switch_to_goal_branch` with suggested commands.
-- [ ] Diverged branches return `manual_review_required` with no mutation commands executed.
-- [ ] `harness pm-branch-plan --project /Users/qiujingyi.7/Harness` runs.
-- [ ] `make pm-branch-plan` runs.
+- [ ] `get_loop_summary()` is read-only and deterministic.
+- [ ] Correctly counts accepted iterations from loop-log.md.
+- [ ] Correctly counts rework entries.
+- [ ] Correctly computes valid_rate from state.yaml.
+- [ ] Extracts last worker commit hash.
+- [ ] Extracts date range from loop-log.
+- [ ] Extracts accepted-result summaries (truncated to 120 chars).
+- [ ] `harness pm-summary --project /Users/qiujingyi.7/Harness` runs and prints formatted output.
+- [ ] `make pm-summary` runs.
 - [ ] `make verify` passes.
 - [ ] One clear git commit is created for this task only.
 
 ## Required Harness process
 
-Risk classify as branch: this touches PM runtime logic, CLI, tests, and Makefile, but must remain read-only. Use TDD-style implementation where practical: tests for branch plan behavior, then implementation, then verification, then report.
+Risk classify as branch: this touches PM runtime logic, CLI, tests, and Makefile. Use TDD-style implementation where practical.
 
 ## Required verification commands
 
@@ -81,9 +77,7 @@ Risk classify as branch: this touches PM runtime logic, CLI, tests, and Makefile
 make test
 make verify-ai
 make pm-status
-make pm-next
-make pm-resume
-make pm-branch-plan
+make pm-summary
 make verify
 git status --short
 git log --oneline -1
