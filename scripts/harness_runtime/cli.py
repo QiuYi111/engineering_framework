@@ -10,7 +10,7 @@ from .verify import run_full_verify, check_role_boundaries
 from .evals import run_eval
 from .context import build_context, format_context, write_context, build_context_cache_aware, format_context_cache_aware
 from .installer import install_skills
-from .pm_runtime import get_pm_status
+from .pm_runtime import decide_next_action, get_pm_status
 
 DIST_ROOT = Path(__file__).resolve().parent.parent.parent
 RESOURCES_DIR = DIST_ROOT / "references"
@@ -509,6 +509,24 @@ def pm_status(project):
         raise SystemExit(1)
     else:
         click.echo("\n✅ PM runtime state is valid.")
+
+
+@main.command("pm-next")
+@click.option("--project", default=None, help="Project root (default: git root or cwd)")
+def pm_next(project):
+    """Print the deterministic next-action decision for the supervisor."""
+    project_root = Path(project).resolve() if project else _git_root()
+    result = decide_next_action(project_root)
+
+    click.echo("=== PM Next Action ===\n")
+    click.echo(f"Action: {result['action']}")
+    click.echo(f"Reason: {result['reason']}")
+    if result["details"]:
+        click.echo("Details:")
+        for d in result["details"]:
+            click.echo(f"  - {d}")
+    else:
+        click.echo("Details: (none)")
 
 
 if __name__ == "__main__":

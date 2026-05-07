@@ -6,6 +6,7 @@ from pathlib import Path
 
 from scripts.harness_runtime.pm_runtime import (
     classify_loop_control,
+    decide_next_action,
     get_pm_status,
     inspect_git,
     parse_state_yaml,
@@ -451,6 +452,238 @@ class TestGetPmStatus(unittest.TestCase):
             root = Path(tmp)
             result = get_pm_status(root)
             self.assertFalse(result["ok"])
+
+
+class TestDecideNextAction(unittest.TestCase):
+
+    _BASE_STATE = textwrap.dedent("""\
+        project_id: "test"
+        current_stage: "feasibility"
+        current_phase: "ready_to_delegate"
+        loop_iteration: 1
+        consecutive_failures: 0
+        max_consecutive_failures: 3
+        readiness: {}
+        worker: {engine: opencode, role: intern, mode: sync}
+        git: {branch_policy: supervisor_managed, current_goal_branch: "b", auto_merge: false, auto_push: false}
+        next_action: {type: delegate, summary: x, blocked: false, needs_user_decision: false}
+        failure_tracking: {}
+    """)
+
+    _COMPLETE_REPORT = textwrap.dedent("""\
+        # Worker Report
+
+        ## Task summary
+        Did the thing.
+
+        ## What was done
+        Added feature.
+
+        ## Changed files
+        - foo.py
+
+        ## Commands run
+        Ran tests.
+
+        ## Test results
+        All pass.
+
+        ## Acceptance criteria
+        - [x] Done
+
+        ## Problems encountered
+        None.
+
+        ## Deviations
+        None.
+
+        ## Evidence
+        See above.
+    """)
+
+    def _make_project(self, tmp: str, *,
+                      state_yaml: str | None = None,
+                      loop_control: str = "CONTINUE",
+                      worker_report: str | None = None,
+                      omit_state: bool = False) -> Path:
+        root = Path(tmp)
+        files = {}
+        for name in [
+            "product.md", "roadmap.md", "architecture-guardrails.md", "acceptance-rubric.md"
+        ]:
+            files[f".pm/stable/{name}"] = "content"
+        if not omit_state:
+            files[".pm/runtime/state.yaml"] = state_yaml if state_yaml is not None else self._BASE_STATE
+        files[".pm/runtime/active-stage.md"] = "stage"
+        files[".pm/runtime/handoff.md"] = "handoff"
+        files[".pm/runtime/loop-control"] = loop_control
+        files[".pm/runtime/next-task.md"] = "task"
+        if worker_report is not None:
+            files[".pm/runtime/worker-report.md"] = worker_report
+        _write_tree(root, files)
+        return root
+
+    def test_invalid_pm_runtime_returns_stop(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, omit_state=True)
+            result = decide_next_action(root)
+            self.assertEqual(result["action"], "stop")
+            self.assertEqual(result["reason"], "invalid_pm_runtime")
+
+    def test_loop_control_stop(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, loop_control="STOP")
+            result = decide_next_action(root)
+            self.assertEqual(result["action"], "stop")
+            self.assertEqual(result["reason"], "loop_control_STOP")
+
+    def test_loop_control_needs_user_decision(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, loop_control="NEEDS_USER_DECISION")
+            result = decide_next_action(root)
+            self.assertEqual(result["action"], "request_user_decision")
+            self.assertEqual(result["reason"], "loop_control_needs_user_decision")
+
+    def test_loop_control_blocked(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, loop_control="BLOCKED")
+            result = decide_next_action(root)
+            self.assertEqual(result["action"], "blocked")
+            self.assertEqual(result["reason"], "loop_control_BLOCKED")
+
+    def test_loop_control_stage_exit_reached(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, loop_control="STAGE_EXIT_REACHED")
+            result = decide_next_action(root)
+            self.assertEqual(result["action"], "stop")
+            self.assertEqual(result["reason"], "loop_control_stage_exit_reached")
+
+    def test_max_iterations_reached(self):
+        import tempfile
+        state = textwrap.dedent("""\
+            project_id: "test"
+            current_stage: "feasibility"
+            current_phase: "ready_to_delegate"
+            loop_iteration: 5
+            max_iterations: 5
+            consecutive_failures: 0
+            max_consecutive_failures: 3
+            readiness: {}
+            worker: {engine: opencode, role: intern, mode: sync}
+            git: {branch_policy: supervisor_managed, current_goal_branch: "b", auto_merge: false, auto_push: false}
+            next_action: {type: delegate, summary: x, blocked: false, needs_user_decision: false}
+            failure_tracking: {}
+        """)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, state_yaml=state)
+            result = decide_next_action(root)
+            self.assertEqual(result["action"], "stop")
+            self.assertEqual(result["reason"], "max_iterations_reached")
+
+    def test_max_iterations_null_allows_continue(self):
+        import tempfile
+        state = textwrap.dedent("""\
+            project_id: "test"
+            current_stage: "feasibility"
+            current_phase: "ready_to_delegate"
+            loop_iteration: 99
+            max_iterations: null
+            consecutive_failures: 0
+            max_consecutive_failures: 3
+            readiness: {}
+            worker: {engine: opencode, role: intern, mode: sync}
+            git: {branch_policy: supervisor_managed, current_goal_branch: "b", auto_merge: false, auto_push: false}
+            next_action: {type: delegate, summary: x, blocked: false, needs_user_decision: false}
+            failure_tracking: {}
+        """)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, state_yaml=state)
+            result = decide_next_action(root)
+            self.assertEqual(result["action"], "delegate")
+
+    def test_consecutive_failures_exceeded(self):
+        import tempfile
+        state = textwrap.dedent("""\
+            project_id: "test"
+            current_stage: "feasibility"
+            current_phase: "waiting_for_worker"
+            loop_iteration: 3
+            max_iterations: 5
+            consecutive_failures: 3
+            max_consecutive_failures: 3
+            readiness: {}
+            worker: {engine: opencode, role: intern, mode: sync}
+            git: {branch_policy: supervisor_managed, current_goal_branch: "b", auto_merge: false, auto_push: false}
+            next_action: {type: delegate, summary: x, blocked: false, needs_user_decision: false}
+            failure_tracking: {}
+        """)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, state_yaml=state)
+            result = decide_next_action(root)
+            self.assertEqual(result["action"], "request_user_decision")
+            self.assertEqual(result["reason"], "consecutive_failures_exceeded")
+
+    def test_waiting_for_worker_no_report_returns_blocked(self):
+        import tempfile
+        state = self._BASE_STATE.replace('"ready_to_delegate"', '"waiting_for_worker"')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, state_yaml=state, worker_report=None)
+            result = decide_next_action(root)
+            self.assertEqual(result["action"], "blocked")
+            self.assertEqual(result["reason"], "waiting_for_worker_report")
+
+    def test_waiting_for_worker_placeholder_report_returns_blocked(self):
+        import tempfile
+        state = self._BASE_STATE.replace('"ready_to_delegate"', '"waiting_for_worker"')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, state_yaml=state,
+                                      worker_report="# Worker Report\n\nNo worker report yet.\n")
+            result = decide_next_action(root)
+            self.assertEqual(result["action"], "blocked")
+            self.assertEqual(result["reason"], "waiting_for_worker_report")
+
+    def test_invalid_worker_report_returns_request_rework(self):
+        import tempfile
+        state = self._BASE_STATE.replace('"ready_to_delegate"', '"waiting_for_worker"')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, state_yaml=state,
+                                      worker_report="# Worker Report\n\n## Objective\nIncomplete.\n")
+            result = decide_next_action(root)
+            self.assertEqual(result["action"], "request_rework")
+            self.assertEqual(result["reason"], "worker_report_invalid")
+
+    def test_valid_report_waiting_for_worker_returns_review(self):
+        import tempfile
+        state = self._BASE_STATE.replace('"ready_to_delegate"', '"waiting_for_worker"')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, state_yaml=state,
+                                      worker_report=self._COMPLETE_REPORT)
+            result = decide_next_action(root)
+            self.assertEqual(result["action"], "review")
+            self.assertEqual(result["reason"], "worker_report_valid_ready_for_review")
+
+    def test_valid_report_review_pending_returns_review(self):
+        import tempfile
+        state = self._BASE_STATE.replace('"ready_to_delegate"', '"review_pending"')
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, state_yaml=state,
+                                      worker_report=self._COMPLETE_REPORT)
+            result = decide_next_action(root)
+            self.assertEqual(result["action"], "review")
+            self.assertEqual(result["reason"], "worker_report_valid_ready_for_review")
+
+    def test_ready_to_delegate_with_continue_returns_delegate(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._make_project(tmp, state_yaml=self._BASE_STATE, loop_control="CONTINUE")
+            result = decide_next_action(root)
+            self.assertEqual(result["action"], "delegate")
+            self.assertEqual(result["reason"], "ready_to_delegate")
 
 
 if __name__ == "__main__":

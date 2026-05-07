@@ -237,6 +237,91 @@ def inspect_git(project_root: Path) -> dict:
     return result
 
 
+def decide_next_action(project_root: Path) -> dict:
+    """Deterministic read-only next-action decision helper for the supervisor.
+
+    Inspects PM runtime state, loop-control, worker-report status, iteration
+    limits, and failure counters to compute what the supervisor should do next.
+
+    Returns dict with:
+        action (str): one of delegate, review, request_rework,
+                      request_user_decision, stop, blocked
+        reason (str): short machine-readable reason
+        details (list[str]): optional specific details
+    """
+    details: list[str] = []
+
+    # ── Invalid PM runtime state → stop ──────────────────────────────────
+    status = get_pm_status(project_root)
+    if not status["ok"]:
+        return {
+            "action": "stop",
+            "reason": "invalid_pm_runtime",
+            "details": [f"pm_status.ok=False, state_error={status.get('state_error')}"],
+        }
+
+    state = status["state"]
+    raw = state.get("raw", {})
+
+    # ── Loop-control directives ──────────────────────────────────────────
+    loop = status["loop_control"]
+    directive = loop["directive"]
+
+    if directive == "STOP":
+        return {"action": "stop", "reason": "loop_control_STOP", "details": []}
+    if directive == "NEEDS_USER_DECISION":
+        return {"action": "request_user_decision", "reason": "loop_control_needs_user_decision", "details": []}
+    if directive == "BLOCKED":
+        return {"action": "blocked", "reason": "loop_control_BLOCKED", "details": []}
+    if directive == "STAGE_EXIT_REACHED":
+        return {"action": "stop", "reason": "loop_control_stage_exit_reached", "details": []}
+
+    # ── Iteration limits ─────────────────────────────────────────────────
+    max_iterations = raw.get("max_iterations")
+    loop_iteration = raw.get("loop_iteration", 0) or 0
+
+    if max_iterations is not None and loop_iteration >= max_iterations:
+        details.append(f"loop_iteration={loop_iteration} >= max_iterations={max_iterations}")
+        return {"action": "stop", "reason": "max_iterations_reached", "details": details}
+
+    # ── Consecutive failures ─────────────────────────────────────────────
+    consecutive_failures = raw.get("consecutive_failures", 0) or 0
+    max_consecutive_failures = raw.get("max_consecutive_failures", 3) or 3
+
+    if consecutive_failures >= max_consecutive_failures:
+        details.append(f"consecutive_failures={consecutive_failures} >= max={max_consecutive_failures}")
+        return {"action": "request_user_decision", "reason": "consecutive_failures_exceeded", "details": details}
+
+    # ── Worker report status ─────────────────────────────────────────────
+    report = status["worker_report"]
+    report_status = report["status"]
+    phase = state.get("phase")
+
+    # waiting_for_worker + no usable report → blocked or ask user
+    if phase == "waiting_for_worker" and report_status in ("not_started", "placeholder"):
+        details.append(f"phase={phase}, report={report_status}")
+        return {"action": "blocked", "reason": "waiting_for_worker_report", "details": details}
+
+    # Invalid worker report → rework
+    if report_status == "invalid":
+        if report.get("missing_sections"):
+            details.append(f"missing sections: {', '.join(report['missing_sections'])}")
+        return {"action": "request_rework", "reason": "worker_report_invalid", "details": details}
+
+    # Valid report + waiting or review phase → review
+    if report_status == "valid" and phase in ("waiting_for_worker", "review_pending"):
+        details.append(f"phase={phase}, report={report_status}")
+        return {"action": "review", "reason": "worker_report_valid_ready_for_review", "details": details}
+
+    # ── Default: delegate if ready ───────────────────────────────────────
+    if directive == "CONTINUE":
+        details.append(f"phase={phase}, loop_control=CONTINUE")
+        return {"action": "delegate", "reason": "ready_to_delegate", "details": details}
+
+    # Fallback
+    return {"action": "stop", "reason": "unknown_state", "details": [f"directive={directive}, phase={phase}"]}
+
+
 def get_pm_status(project_root: Path) -> dict:
     """Collect full PM runtime status for a project.
 
