@@ -15,7 +15,7 @@ Product contract is frozen. Harness is in feasibility stage for dogfood-grade `/
 
 ## Next Expected Action
 
-Wait for OpenCode intern to complete `.pm/runtime/next-task.md`, then review `.pm/runtime/worker-report.md`.
+Request rework from OpenCode intern using `.pm/runtime/next-task.md`, then review the updated `.pm/runtime/worker-report.md`.
 
 ## Important Constraints
 
@@ -23,6 +23,7 @@ Wait for OpenCode intern to complete `.pm/runtime/next-task.md`, then review `.p
 - Supervisor manages branch policy.
 - Intern must create a clear commit for each accepted task.
 - Existing modified file `scripts/harness_runtime/verify.py` predates this worker task and is forbidden scope.
+- Prior worker commit `6125f40` was rejected because loop-control protocol values did not match supervisor protocol.
 - No auto-merge, push, publish, or deploy.
 - Stop for core, infra, security, auth, payment, deployment, or product-boundary changes.
 
