@@ -15,7 +15,7 @@ Product contract is frozen. Harness is in feasibility stage for dogfood-grade `/
 
 ## Next Expected Action
 
-Wait for OpenCode intern to complete `.pm/runtime/next-task.md`, then review `.pm/runtime/worker-report.md`.
+Create the next bounded feasibility task, then delegate to OpenCode intern.
 
 ## Important Constraints
 
@@ -28,6 +28,8 @@ Wait for OpenCode intern to complete `.pm/runtime/next-task.md`, then review `.p
 - Worker commit `8cfc1e6` is accepted as iteration 2.
 - Worker-report validation now rejects incomplete reports with missing section details.
 - Current task adds deterministic `pm-next` decision helper.
+- Worker commit `9265b88` is accepted as iteration 3 after supervisor remediated a branch-policy violation.
+- Next task should strengthen branch-policy enforcement before worker execution.
 - No auto-merge, push, publish, or deploy.
 - Stop for core, infra, security, auth, payment, deployment, or product-boundary changes.
 
