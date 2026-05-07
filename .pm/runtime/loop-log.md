@@ -126,3 +126,27 @@ Append-only log. Each supervisor iteration adds one entry.
 - Iteration total count: 5
 - Stage result: bounded feasibility validation passed 5/5
 - Next action: stop at Stage 1 exit before unbounded `/goal` mode
+
+## Supervisor Delegation 6
+
+- Date: 2026-05-07
+- Phase: worker_running
+- Branch: codex/dogfood
+- Summary: Wrote Stage 2 slash-command protocol hardening task after user approved continued dogfood.
+- Worker mode: sync OpenCode via `/harness-intern`
+- PM ledger commit: 82f596f
+- Forbidden scope: pre-existing `scripts/harness_runtime/verify.py`, `subskills/opencode-cli/SKILL.md`, `subskills/opencode-cli/references/patterns.md`, `.pm/stable/*`
+
+## Supervisor Review 6
+
+- Date: 2026-05-07
+- Phase: ready_to_delegate
+- Worker commits: 88302a4, a5d15b5
+- Verdict: accepted after rework
+- Rework reason: initial review command example used `/review` instead of `/harness review`, and Makefile `verify` omitted `test`
+- Independent reviewers: 3 parallel read-only `/harness review` agents, all pass
+- Evidence: make verify passed, make pm-next delegate, make pm-resume ok, worker report validator returned valid
+- Accepted result: slash-command delegation, independent review guidance, commit taxonomy, and Makefile entrypoints are in place
+- Iteration valid count: 6
+- Iteration total count: 6
+- Next action: continue Stage 2 dogfood with another bounded improvement task

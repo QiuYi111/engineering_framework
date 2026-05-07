@@ -2,7 +2,7 @@
 
 ## Current State
 
-Product contract is frozen. Harness is in feasibility stage for dogfood-grade `/goal` long-running supervisor loop.
+Product contract is frozen. Harness is in delivery stage for unbounded `/goal` dogfood on Harness itself.
 
 ## Read First On Resume
 
@@ -12,35 +12,34 @@ Product contract is frozen. Harness is in feasibility stage for dogfood-grade `/
 4. `.pm/stable/product.md`
 5. `.pm/runtime/loop-log.md`
 6. `.pm/runtime/loop-control`
+7. `.pm/runtime/acceptance-review.md`
 
 ## Next Expected Action
 
-Stage exit reached. Await user confirmation before entering Stage 2 unbounded `/goal` dogfood.
+Continue Stage 2 dogfood by selecting the next bounded Harness improvement task and delegating it through `/harness-intern`.
 
 ## Important Constraints
 
 - Do not overwrite user changes.
 - Supervisor manages branch policy.
-- Intern must create a clear commit for each accepted task.
-- Existing modified file `scripts/harness_runtime/verify.py` predates this worker task and is forbidden scope.
-- Worker commit `6125f40` plus rework commit `07d4af8` are accepted as iteration 1.
-- The new `harness pm-status` command is available and should be used in future supervisor checks.
-- Worker commit `8cfc1e6` is accepted as iteration 2.
-- Worker-report validation now rejects incomplete reports with missing section details.
-- Current task adds deterministic `pm-next` decision helper.
-- Worker commit `9265b88` is accepted as iteration 3 after supervisor remediated a branch-policy violation.
-- Next task should strengthen branch-policy enforcement before worker execution.
-- Current task adds read-only branch-policy validation.
-- Worker commit `df9f58e` is accepted as iteration 4.
-- Branch-policy mismatch is now visible in `pm-status` and blocks `pm-next`.
-- Next task should add deterministic resume-context support.
-- Current task adds read-only `pm-resume` context support.
-- Worker commit `b8aab4e` is accepted as iteration 5.
-- Bounded feasibility validation passed: 5 valid iterations out of 5.
-- `feasibility_ready: true`.
+- Intern creates one clear product commit per accepted task or rework.
+- Supervisor records PM ledger commits separately.
+- Existing modified files below predate this task and are forbidden scope unless the user explicitly asks to work on them:
+  - `scripts/harness_runtime/verify.py`
+  - `subskills/opencode-cli/SKILL.md`
+  - `subskills/opencode-cli/references/patterns.md`
 - No auto-merge, push, publish, or deploy.
 - Stop for core, infra, security, auth, payment, deployment, or product-boundary changes.
 
+## Accepted Iterations
+
+- Iteration 1: `pm-status` runtime health check; accepted after rework (`6125f40`, `07d4af8`).
+- Iteration 2: strict worker-report validation; accepted (`8cfc1e6`).
+- Iteration 3: deterministic `pm-next`; accepted with branch-policy warning remediated (`9265b88`).
+- Iteration 4: branch-policy validation; accepted (`df9f58e`).
+- Iteration 5: deterministic `pm-resume`; accepted (`b8aab4e`).
+- Iteration 6: slash-command delegation, independent review guidance, commit taxonomy, and Makefile entrypoints; accepted after rework (`88302a4`, `a5d15b5`).
+
 ## Current User Decision
 
-The user approved dogfood MVP, no visual UI, `/goal` long-run requirement, sync worker mode for first validation, and branch/commit separation.
+The user approved dogfood MVP, no visual UI, `/goal` long-run requirement, sync worker mode for first validation, branch/commit separation, independent reviewer agents, Makefile convention, and continued Stage 2 dogfood.
