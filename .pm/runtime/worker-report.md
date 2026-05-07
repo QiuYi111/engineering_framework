@@ -1,48 +1,42 @@
 # Worker Report
 
-## Objective
+## Task summary
 
-Rework the PM runtime loop-control classifier to match the supervisor protocol values (rework of commit `6125f40`).
+Strengthen `validate_worker_report()` so it validates required worker-report sections, returning `invalid` with missing section details for incomplete reports instead of accepting any report that contains markdown headings.
 
-## Changes
+## What was done
 
-- **Modified file**: `scripts/harness_runtime/pm_runtime.py`
-  - Replaced `LOOP_CONTROL_VALID` set: `{"CONTINUE", "STOP", "USER_DECISION"}` → `{"CONTINUE", "STOP", "NEEDS_USER_DECISION", "BLOCKED", "STAGE_EXIT_REACHED"}`
-  - Updated `classify_loop_control()` descriptions dict to cover all five protocol directives with human-readable reasons
-  - Removed `USER_DECISION` — not a legacy alias, fully removed from the valid set
+- **Modified**: `scripts/harness_runtime/pm_runtime.py`
+  - Added `REQUIRED_REPORT_SECTIONS`: 9 required sections with canonical names and acceptable alternative heading texts (e.g., "Task summary" accepts headings "task summary" or "objective")
+  - Added `_section_present()` helper for case-insensitive substring matching
+  - Rewrote `validate_worker_report()` to check all required sections after the existing placeholder/not_started detection
+  - New return status `invalid` with `missing_sections` list when required sections are absent
+  - Added `missing_sections` key (empty list) to all return paths for consistent dict shape
 
-- **Modified file**: `tests/test_pm_runtime.py`
-  - Replaced `test_user_decision` with `test_needs_user_decision`
-  - Added `test_blocked` — validates `BLOCKED` is accepted
-  - Added `test_stage_exit_reached` — validates `STAGE_EXIT_REACHED` is accepted
-  - Added `test_legacy_user_decision_rejected` — confirms `USER_DECISION` is now rejected as unknown
-  - Retained `test_unknown_directive` (generic unknown) and `test_missing_file`
-  - Total tests: 21 (was 18 before this rework, net +3)
+- **Modified**: `scripts/harness_runtime/cli.py`
+  - `pm-status` command now prints missing sections below the worker report status line when present
 
-## Forbidden scope respected
+- **Modified**: `tests/test_pm_runtime.py`
+  - Replaced the 4 original `TestValidateWorkerReport` tests with 8 tests covering all status transitions
+  - New tests: `test_valid_report_with_all_sections`, `test_invalid_report_missing_sections`, `test_alternative_heading_names_accepted`, `test_no_headings_is_not_started`, `test_invalid_report_missing_sections_field_populated`
+  - Total tests: 25 (was 21, net +4)
 
-- `scripts/harness_runtime/verify.py` was NOT modified (pre-existing user change, forbidden scope)
-- `.pm/stable/*` was NOT modified
-- `scripts/harness_runtime/cli.py` was NOT modified
-- No worker execution, background daemon, auto-merge, auto-push, or deployment behavior added
+## Changed files
 
-## Risk classification
+- `scripts/harness_runtime/pm_runtime.py`
+- `scripts/harness_runtime/cli.py`
+- `tests/test_pm_runtime.py`
 
-`leaf` — changed a read-only classifier constant and its test descriptions. No core logic, infra, security, auth, or deployment.
-
-## Verification evidence
+## Commands run
 
 ```
 $ uv run harness pm-status --project /Users/qiujingyi.7/Harness
-=== PM Runtime Status ===
-Structure: OK
-Stage: feasibility
-Phase: waiting_for_worker
-Loop control: CONTINUE (valid — supervisor should continue delegating)
+Worker report: invalid — missing required sections: Changed files, Test results, Problems encountered
+  Missing: Changed files, Test results, Problems encountered
 ✅ PM runtime state is valid.
 
 $ uv run python -m unittest discover -s tests
-Ran 21 tests in 0.046s
+Ran 25 tests in 0.045s
 OK
 
 $ uv run harness verify-ai --project /Users/qiujingyi.7/Harness
@@ -50,22 +44,36 @@ $ uv run harness verify-ai --project /Users/qiujingyi.7/Harness
 🎉 All required checks passed.
 ```
 
-## Git state
+## Test results
 
-- Commit: `07d4af8` on branch `codex/dogfood`
-- Changed files in commit: `pm_runtime.py`, `test_pm_runtime.py` (2 files)
-- Pre-existing dirty file `verify.py` was intentionally excluded from commit
+25 tests pass (was 21). New test cases:
+
+- `test_valid_report_with_all_sections`: complete report → `valid`
+- `test_invalid_report_missing_sections`: partial report → `invalid` with 7 missing sections listed
+- `test_alternative_heading_names_accepted`: alternative names like "Objective", "Files Changed", "Verification" → `valid`
+- `test_no_headings_is_not_started`: plain text → `not_started`
+- `test_invalid_report_missing_sections_field_populated`: sparse report → `invalid` with populated `missing_sections`
 
 ## Acceptance criteria
 
-- [x] `classify_loop_control()` accepts `CONTINUE`, `STOP`, `NEEDS_USER_DECISION`, `BLOCKED`, and `STAGE_EXIT_REACHED`
-- [x] Tests cover each accepted loop-control directive (5 positive tests + 1 legacy rejection + 1 generic unknown)
-- [x] Unknown directives still fail
-- [x] `uv run harness pm-status --project /Users/qiujingyi.7/Harness` runs successfully
-- [x] `uv run python -m unittest discover -s tests` passes (21/21)
+- [x] `validate_worker_report()` returns `invalid` with missing section details for incomplete reports
+- [x] Placeholder reports are still not treated as valid
+- [x] A complete report with required sections returns `valid`
+- [x] `harness pm-status` still runs successfully on this repository
+- [x] `uv run python -m unittest discover -s tests` passes (25/25)
 - [x] `uv run harness verify-ai --project /Users/qiujingyi.7/Harness` passes (47/47)
-- [x] Clear git commit `07d4af8` for rework only (verify.py excluded)
+- [x] Clear git commit `8cfc1e6` for this task only (verify.py excluded)
+
+## Problems encountered
+
+None.
 
 ## Deviations
 
-None.
+None. All changes stayed within allowed scope. `verify.py` was not touched.
+
+## Evidence
+
+- Commit: `8cfc1e6` on branch `codex/dogfood`
+- Pre-existing dirty file `verify.py` intentionally excluded from commit
+- `git status --short` shows only `M scripts/harness_runtime/verify.py` as remaining dirty file
