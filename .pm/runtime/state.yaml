@@ -65,7 +65,7 @@ worker:
 
 git:
   branch_policy: supervisor_managed
-  current_goal_branch: "codex/dogfood"
+  current_goal_branch: "main"
   intern_commit_required: true
   auto_merge: false
   auto_push: false

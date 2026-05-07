@@ -2,7 +2,7 @@
 
 ## Current State
 
-Product contract is frozen. Harness is in Stage 2 delivery for unbounded `/goal` dogfood. 7 iterations completed, all accepted.
+Product contract is frozen. Harness is in Stage 2 delivery for unbounded `/goal` dogfood. 10 iterations completed, all accepted.
 
 ## Read First On Resume
 
@@ -33,7 +33,7 @@ Continue Stage 2 dogfood by selecting the next bounded Harness improvement task 
 
 ## Branch Note
 
-`main` and `codex/dogfood` have diverged by 1 commit each (identical "update" commits on the same 3 forbidden files). The worker commit `659c499` is the shared merge base. `pm-branch-plan` correctly detects this as `manual_review_required`. User should resolve when convenient (trivial fast-forward or merge since content is identical).
+`codex/dogfood` has been merged into `main`. The active PM runtime branch policy now targets `main`.
 
 ## Accepted Iterations
 

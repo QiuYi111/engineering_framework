@@ -10,7 +10,7 @@ Use unbounded `/goal` dogfood to improve Harness itself after bounded feasibilit
 
 ## Current Objective
 
-Harden the supervisor loop based on dogfood findings: explicit slash-command delegation, independent review agents, auditable commit taxonomy, and Makefile-based verification.
+Continue Stage 2 dogfood from `main` after merging `codex/dogfood`. Current runtime supports slash-command/Task-tool delegation routing, branch correction planning, loop summary, failure breaker visibility, and hard independent-review gating.
 
 ## Exit Criteria
 
@@ -21,4 +21,4 @@ Harden the supervisor loop based on dogfood findings: explicit slash-command del
 
 ## Next Expected Action
 
-Supervisor should delegate the slash-command protocol hardening task to OpenCode Intern.
+Supervisor should select the next bounded Harness improvement task, ensure independent review evidence is recorded, then delegate through the environment-appropriate intern route.
