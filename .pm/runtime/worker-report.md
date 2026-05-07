@@ -2,44 +2,43 @@
 
 ## Task summary
 
-Add a read-only branch correction plan helper (`get_branch_correction_plan`) so the supervisor can recover from branch drift without guessing or mutating git state.
+Add a read-only PM loop run summary helper (`get_loop_summary`) and `pm-summary` CLI command for supervisor audit.
 
 ## What was done
 
-- **Added**: `get_branch_correction_plan()` in `scripts/harness_runtime/pm_runtime.py`
-  - Purely read-only function that inspects current branch, expected goal branch, and ancestry relationships
-  - Returns one of 5 statuses: `ok`, `safe_fast_forward_goal_branch`, `safe_switch_to_goal_branch`, `manual_review_required`, `unknown`
-  - Suggests non-destructive correction commands when safe to do so
+- **Added**: `get_loop_summary()` in `scripts/harness_runtime/pm_runtime.py`
+  - Parses loop-log.md entries to count accepted iterations, reworks, blockers
+  - Extracts delivered iteration summaries (truncated to 120 chars)
+  - Extracts last worker commit hash and date range
+  - Computes valid_rate from state.yaml
 
-- **Added**: `pm-branch-plan` CLI command in `scripts/harness_runtime/cli.py`
-  - Click command printing formatted branch correction plan
-  - Follows same pattern as existing `pm-status`, `pm-next`, `pm-resume` commands
+- **Added**: `pm-summary` CLI command in `scripts/harness_runtime/cli.py`
+  - Click command printing formatted audit summary
+  - Follows same pattern as existing PM commands
 
 - **Updated**: `Makefile`
-  - Added `pm-branch-plan` to `.PHONY`
-  - Added `pm-branch-plan` target with help text
+  - Added `pm-summary` to `.PHONY`
+  - Added `pm-summary` target with help text
 
-- **Added**: 8 focused tests in `tests/test_pm_runtime.py`
-  - `TestGetBranchCorrectionPlan` class with all spec-required test cases
-  - All git subprocess calls mocked (no real git repos created)
+- **Added**: 7 focused tests in `tests/test_pm_runtime.py`
+  - `TestGetLoopSummary` class with all spec-required test cases
 
 ## Changed files
 
-- `scripts/harness_runtime/pm_runtime.py` — added `get_branch_correction_plan()` function
-- `scripts/harness_runtime/cli.py` — added import and `pm-branch-plan` command
+- `scripts/harness_runtime/pm_runtime.py` — added `get_loop_summary()` function
+- `scripts/harness_runtime/cli.py` — added import and `pm-summary` command
 - `Makefile` — added `.PHONY` entry and target
-- `tests/test_pm_runtime.py` — added `TestGetBranchCorrectionPlan` with 8 tests
+- `tests/test_pm_runtime.py` — added `TestGetLoopSummary` with 7 tests
 
 ## Commands run
 
 ```
 $ make test
-65 passed in 0.68s
+72 passed in 0.70s
 EXIT: 0
 
 $ make verify-ai
 47 passed, 0 failed, 1 warnings
-🎉 All required checks passed.
 EXIT: 0
 
 $ make pm-status
@@ -47,61 +46,53 @@ $ make pm-status
 Branch policy: ✅ ok
 EXIT: 0
 
-$ make pm-next
-Action: delegate
-Reason: ready_to_delegate
-EXIT: 0
-
-$ make pm-resume
-Stage: delivery, Phase: worker_running, Loop iteration: 6
-EXIT: 0
-
-$ make pm-branch-plan
-=== PM Branch Correction Plan ===
-Status: ok
-Current branch: codex/dogfood
-Expected branch: codex/dogfood
-Reason: already on expected branch 'codex/dogfood'
-No correction commands suggested.
+$ make pm-summary
+=== PM Loop Run Summary ===
+Stage: delivery
+Duration: 2026-05-07
+Last commit: 659c499
+Consecutive failures: 0
+Blockers: 0
+Iterations: 7 accepted, 1 reworks
+Delivered (7):
+  1. PM runtime health-check foundation and `harness pm-status` are available
+  ...
 EXIT: 0
 
 $ make verify
-(test + verify-ai + pm-status all pass)
+✅ PM runtime state is valid.
 EXIT: 0
 
 $ git status --short
- M Makefile
- M scripts/harness_runtime/cli.py
- M scripts/harness_runtime/pm_runtime.py
- M tests/test_pm_runtime.py
-(verify.py and opencode-cli/* are pre-existing dirty, not touched by this task)
+(none)
 ```
 
 ## Test results
 
-65 tests pass (8 new tests in `TestGetBranchCorrectionPlan`). All pre-existing tests continue to pass.
+72 tests pass (7 new tests in `TestGetLoopSummary`). All pre-existing tests continue to pass.
 
 New tests:
-- `test_matching_branch_returns_ok` — current == expected → ok
-- `test_no_goal_branch_returns_ok` — no goal branch configured → ok
-- `test_expected_ancestor_of_current_returns_fast_forward` — safe fast-forward with 2 commands
-- `test_current_ancestor_of_expected_returns_switch` — safe switch with 1 command
-- `test_diverged_returns_manual_review` — neither is ancestor → manual review
-- `test_nonexistent_expected_branch_returns_manual_review` — branch doesn't exist → manual review
-- `test_git_error_returns_unknown` — git inspection failure → unknown
-- `test_read_only_does_not_mutate` — verifies no file mutations
+- `test_empty_log_returns_zeros` — no loop-log → all zeros
+- `test_single_accepted_iteration` — one accepted entry → total_iterations=1
+- `test_rework_counted` — one needs_rework entry → total_reworks=1
+- `test_valid_rate_from_state` — state with 5/5 → valid_rate=1.0
+- `test_dates_extracted` — two entries with different dates → range
+- `test_last_commit_extracted` — Worker commit → last_commit populated
+- `test_blockers_counted` — Phase: blocked → blockers=1
 
 ## Acceptance criteria
 
-- [x] `get_branch_correction_plan()` is purely read-only (never mutates git state)
-- [x] Function returns correct status for all 5 cases: ok, safe_fast_forward_goal_branch, safe_switch_to_goal_branch, manual_review_required, unknown
-- [x] CLI command `harness pm-branch-plan` runs without error and prints formatted output
-- [x] Makefile target `pm-branch-plan` added and works
-- [x] All 8 required tests pass with mocked git subprocess calls
-- [x] Import added to both `pm_runtime.py` exports and `cli.py`
-- [x] `.PHONY` line in Makefile updated
-- [x] All verification commands pass (make test, make verify-ai, make pm-status, make pm-next, make pm-resume, make pm-branch-plan, make verify)
-- [x] Forbidden files not touched (verify.py, opencode-cli/SKILL.md, opencode-cli/references/patterns.md, .pm/stable/*)
+- [x] `get_loop_summary()` is read-only and deterministic
+- [x] Correctly counts accepted iterations from loop-log.md
+- [x] Correctly counts rework entries
+- [x] Correctly computes valid_rate from state.yaml
+- [x] Extracts last worker commit hash
+- [x] Extracts date range from loop-log
+- [x] Extracts accepted-result summaries (truncated to 120 chars)
+- [x] `harness pm-summary` runs and prints formatted output
+- [x] `make pm-summary` runs
+- [x] `make verify` passes
+- [x] One clear git commit created (`ceec0ce`)
 
 ## Problems encountered
 
@@ -114,7 +105,6 @@ None. All changes stayed within allowed scope.
 ## Evidence
 
 - Branch: `codex/dogfood` (branch-policy ok)
-- 65/65 tests pass (8 new + 57 existing)
-- All 7 Makefile targets exit 0 (test, verify-ai, pm-status, pm-next, pm-resume, pm-branch-plan, verify)
-- `harness verify-ai` passes (47/0/1)
-- Forbidden files show pre-existing diffs only, none staged by this task
+- 72/72 tests pass (7 new + 65 existing)
+- `make pm-summary` shows 7 accepted iterations with correct delivered summaries
+- Forbidden files not touched

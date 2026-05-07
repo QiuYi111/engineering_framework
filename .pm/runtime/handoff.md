@@ -44,6 +44,7 @@ Continue Stage 2 dogfood by selecting the next bounded Harness improvement task 
 - Iteration 5: deterministic `pm-resume`; accepted (`b8aab4e`).
 - Iteration 6: slash-command delegation, independent review guidance, commit taxonomy, and Makefile entrypoints; accepted after rework (`88302a4`, `a5d15b5`).
 - Iteration 7: read-only branch correction plan helper (`pm-branch-plan`); accepted (`659c499`).
+- Iteration 8: loop run summary helper (`pm-summary`); accepted (`ceec0ce`). Delegation bug discovered and fixed: OpenCode supervisor must use Task tool, not opencode CLI.
 
 ## Current User Decision
 
