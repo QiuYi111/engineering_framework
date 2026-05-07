@@ -1,0 +1,79 @@
+project_id: "harness-dogfood-goal-loop"
+status: active
+
+current_stage: "feasibility"
+current_stage_goal: "Prove dogfood-grade /goal long-running supervisor loop"
+current_phase: "ready_to_delegate"
+loop_iteration: 0
+
+ui_direction_required: false
+
+max_iterations: 5
+consecutive_failures: 0
+max_consecutive_failures: 3
+iteration_valid_count: 0
+iteration_total_count: 0
+
+failure_tracking:
+  last_failure_signature: null
+  last_failure_reason: null
+  same_failure_count: 0
+
+readiness:
+  product_definition_ready: true
+  evidence_ready: true
+  ux_ready: true
+  ux_depth: not_applicable
+  ui_direction_ready: true
+  roadmap_ready: true
+  feasibility_ready: false
+
+supervisor_authority:
+  can:
+    - plan
+    - manage_branch
+    - delegate
+    - review
+    - update_state
+    - request_rework
+    - call_grill_product
+    - call_harness_context
+    - call_harness_eval
+  cannot:
+    - change_product_positioning
+    - change_mvp_boundary_without_user
+    - change_core_tech_stack_without_user
+    - approve_core_or_infra_risk
+    - approve_security_payment_auth_deployment_changes
+    - auto_merge
+    - auto_push
+
+worker:
+  engine: opencode
+  role: intern
+  mode: sync
+  current_task_file: .pm/runtime/next-task.md
+  current_report_file: .pm/runtime/worker-report.md
+  last_run_id: null
+
+git:
+  branch_policy: supervisor_managed
+  current_goal_branch: null
+  intern_commit_required: true
+  auto_merge: false
+  auto_push: false
+
+last_verified:
+  commit: null
+  test_command: "uv run harness verify-ai --project /Users/qiujingyi.7/Harness"
+  test_result: "pass: 47 passed, 0 failed, 1 warning"
+  harness_eval_result: unknown
+
+next_action:
+  type: "delegate"
+  summary: "Build the first executable bounded /goal loop runtime for five-iteration dogfood validation"
+  blocked: false
+  needs_user_decision: false
+
+stop_reason: null
+last_updated: "2026-05-07"

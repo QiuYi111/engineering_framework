@@ -1,0 +1,13 @@
+worker:
+  engine: opencode
+  role: intern
+  mode: sync
+  command: "opencode run --agent harness-intern -f .pm/runtime/next-task.md"
+  report_path: ".pm/runtime/worker-report.md"
+  timeout_minutes: 30
+
+branch_policy:
+  supervisor_managed: true
+  intern_commit_required: true
+  auto_merge: false
+  auto_push: false
