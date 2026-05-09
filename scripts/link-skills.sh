@@ -31,9 +31,12 @@ case "$AGENT" in
   windsurf)
     TARGET_DIR="${TARGET_DIR:-$HOME/.windsurf/skills/harness}"
     ;;
+  opencode)
+    TARGET_DIR="${TARGET_DIR:-$HOME/.agents/skills/harness}"
+    ;;
   *)
     echo "Unknown agent: $AGENT"
-    echo "Supported: claude-code, codex, cursor, windsurf"
+    echo "Supported: claude-code, codex, cursor, windsurf, opencode"
     exit 1
     ;;
 esac
@@ -42,6 +45,7 @@ echo "Installing Harness skills for $AGENT..."
 echo "  Source: $SOURCE_DIR"
 echo "  Target: $TARGET_DIR"
 
+# --- Link root skill ---
 if [ -e "$TARGET_DIR" ]; then
   if [ -L "$TARGET_DIR" ]; then
     rm "$TARGET_DIR"
@@ -59,8 +63,38 @@ echo "  ✓ Linked: harness (root skill + subskills)"
 linked=1
 skipped=0
 
+# --- Link subskills as individual entries ---
+SUBSKILLS_DIR="$SOURCE_DIR/subskills"
+if [ -d "$SUBSKILLS_DIR" ]; then
+  SKILLS_ROOT="$(dirname "$TARGET_DIR")"
+  for subskill_dir in "$SUBSKILLS_DIR"/*/; do
+    [ -d "$subskill_dir" ] || continue
+    subskill_name="$(basename "$subskill_dir")"
+    link_path="$SKILLS_ROOT/harness-$subskill_name"
+
+    if [ -e "$link_path" ]; then
+      if [ -L "$link_path" ]; then
+        existing_target="$(readlink "$link_path")"
+        if [ "$existing_target" = "$subskill_dir" ]; then
+          skipped=$((skipped + 1))
+          continue
+        fi
+        rm "$link_path"
+      else
+        echo "  ⚠ Skipping harness-$subskill_name: non-symlink exists at $link_path"
+        skipped=$((skipped + 1))
+        continue
+      fi
+    fi
+
+    ln -s "$subskill_dir" "$link_path"
+    echo "  ✓ Linked: harness-$subskill_name"
+    linked=$((linked + 1))
+  done
+fi
+
 echo ""
-echo "Done. Linked $linked skill, skipped $skipped."
+echo "Done. Linked $linked skill(s), skipped $skipped."
 echo ""
 
 if [ "$AGENT" = "claude-code" ]; then
