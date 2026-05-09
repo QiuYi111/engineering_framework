@@ -1,9 +1,12 @@
 """Harness atlas — semantic code audit module.
 
-Provides language detection, template loading, and prompt assembly
-for the `harness atlas` CLI command.
+Provides language detection, template loading, prompt assembly,
+and pretty-mermaid dependency management for the `harness atlas` CLI command.
 """
 
+import os
+import shutil
+import subprocess
 from pathlib import Path
 
 
@@ -23,6 +26,85 @@ EXTENSION_LANGUAGE_MAP: dict[str, str] = {
 }
 
 ATLAS_SUBSKILL_DIR = Path(__file__).resolve().parent.parent.parent / "subskills" / "atlas"
+
+PRETTY_MERMAID_REPO = "https://github.com/imxv/Pretty-mermaid-skills.git"
+PRETTY_MERMAID_SKILL_NAME = "pretty-mermaid"
+
+
+def _skills_dir() -> Path:
+    return Path(os.path.expanduser("~/.claude/skills"))
+
+
+def _skill_install_dir() -> Path:
+    return _skills_dir() / PRETTY_MERMAID_SKILL_NAME
+
+
+def is_pretty_mermaid_installed() -> bool:
+    return (_skill_install_dir() / "SKILL.md").is_file()
+
+
+def ensure_pretty_mermaid(auto_install: bool = True) -> dict:
+    """Check if pretty-mermaid is installed; optionally install it.
+
+    Returns:
+        dict with 'installed' (bool), 'path' (str|None), 'action' (str).
+    """
+    if is_pretty_mermaid_installed():
+        return {
+            "installed": True,
+            "path": str(_skill_install_dir()),
+            "action": "already_installed",
+        }
+
+    if not auto_install:
+        return {
+            "installed": False,
+            "path": None,
+            "action": "skip",
+        }
+
+    install_dir = _skill_install_dir()
+    tmp_clone = Path(f"/tmp/pretty-mermaid-install-{os.getpid()}")
+
+    if not shutil.which("git"):
+        return {
+            "installed": False,
+            "path": None,
+            "action": "no_git",
+        }
+
+    try:
+        subprocess.run(
+            ["git", "clone", "--depth", "1", PRETTY_MERMAID_REPO, str(tmp_clone)],
+            capture_output=True, text=True, timeout=120, check=True,
+        )
+
+        install_dir.parent.mkdir(parents=True, exist_ok=True)
+        if install_dir.exists():
+            shutil.rmtree(install_dir)
+        shutil.copytree(tmp_clone, install_dir)
+
+        if (install_dir / "package.json").exists() and shutil.which("npm"):
+            subprocess.run(
+                ["npm", "install", "--no-fund", "--no-audit"],
+                capture_output=True, text=True, timeout=120, check=True,
+                cwd=str(install_dir),
+            )
+
+        return {
+            "installed": True,
+            "path": str(install_dir),
+            "action": "installed",
+        }
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+        return {
+            "installed": False,
+            "path": None,
+            "action": f"install_failed: {e}",
+        }
+    finally:
+        if tmp_clone.exists():
+            shutil.rmtree(tmp_clone, ignore_errors=True)
 
 
 def detect_language(filepath: str | Path) -> str:

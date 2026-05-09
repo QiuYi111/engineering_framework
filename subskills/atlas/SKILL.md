@@ -286,9 +286,37 @@ harness atlas src/main.go --language go --strict
 
 ## 前置条件
 
+### 必读参考文件
+
 生成 atlas 前读取以下参考文件：
 
 - [templates/semantic_atlas.md](templates/semantic_atlas.md) — 输出模板（14 个 section 结构）
 - [references/OUTPUT_STRUCTURE.md](references/OUTPUT_STRUCTURE.md) — 每个 section 的字段定义和生成规则
 - [references/FAITHFULNESS_RULES.md](references/FAITHFULNESS_RULES.md) — 忠实性规则（置信度、禁止规则、覆盖率）
 - [references/RISK_CATALOG.md](references/RISK_CATALOG.md) — 16 类风险清单（用于 Section 9 风险识别）
+
+### 外部依赖：pretty-mermaid
+
+atlas 生成的 Mermaid 图表需要使用 **pretty-mermaid** skill 渲染为高质量 SVG。
+
+**检测方式**：检查 `~/.claude/skills/pretty-mermaid/SKILL.md`（opencode）或 `~/.codex/skills/pretty-mermaid/SKILL.md`（codex）是否存在。
+
+**如果未安装，执行安装**：
+```bash
+cd /tmp && git clone https://github.com/imxv/Pretty-mermaid-skills.git pretty-mermaid-install && \
+mkdir -p ~/.claude/skills/pretty-mermaid && \
+cp -r pretty-mermaid-install/* ~/.claude/skills/pretty-mermaid/ && \
+cd ~/.claude/skills/pretty-mermaid && npm install --no-fund --no-audit && \
+rm -rf /tmp/pretty-mermaid-install
+```
+
+对 codex 替换 `~/.claude/skills` 为 `~/.codex/skills`。
+
+**使用方式**：生成 atlas 中的 Mermaid 图表后，调用 pretty-mermaid 渲染：
+```bash
+node ~/.claude/skills/pretty-mermaid/scripts/render.mjs \
+  --input diagram.mmd --output diagram.svg \
+  --theme tokyo-night --format svg
+```
+
+CLI 命令 `harness atlas` 会自动检测并提示安装。当 `--verify-mermaid` 启用时，会同时使用 pretty-mermaid 验证和渲染图表。

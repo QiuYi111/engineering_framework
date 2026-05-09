@@ -11,7 +11,7 @@ from .evals import run_eval
 from .context import build_context, format_context, write_context, build_context_cache_aware, format_context_cache_aware
 from .installer import install_skills
 from .pm_runtime import decide_next_action, get_failure_breaker_status, get_pm_status, get_resume_context, get_branch_correction_plan, get_loop_summary
-from .semantic_atlas import detect_language, resolve_output_path, load_template, assemble_prompt
+from .semantic_atlas import detect_language, resolve_output_path, load_template, assemble_prompt, ensure_pretty_mermaid
 
 DIST_ROOT = Path(__file__).resolve().parent.parent.parent
 RESOURCES_DIR = DIST_ROOT / "references"
@@ -662,6 +662,18 @@ def pm_branch_plan(project):
 @click.option("--language", default=None, help="Override language detection (python|typescript|cpp|javascript|c|rust|go)")
 def atlas(source, output_dir, strict, diagram_heavy, verify_mermaid, language):
     """Generate semantic atlas from source code."""
+    dep = ensure_pretty_mermaid(auto_install=True)
+    if dep["action"] == "installed":
+        click.echo(f"Installed pretty-mermaid → {dep['path']}")
+    elif dep["action"] == "already_installed":
+        pass
+    elif dep["action"] == "no_git":
+        click.echo("Warning: git not found — cannot auto-install pretty-mermaid.", err=True)
+        click.echo("  Install manually: git clone https://github.com/imxv/Pretty-mermaid-skills ~/.claude/skills/pretty-mermaid", err=True)
+    elif dep["action"].startswith("install_failed"):
+        click.echo(f"Warning: pretty-mermaid install failed — {dep['action']}", err=True)
+        click.echo("  Install manually: git clone https://github.com/imxv/Pretty-mermaid-skills ~/.claude/skills/pretty-mermaid", err=True)
+
     src_path = Path(source)
     if not src_path.exists():
         click.echo(f"Error: {source} not found.", err=True)
