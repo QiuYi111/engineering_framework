@@ -1,71 +1,100 @@
 # Changelog
 
-All notable changes to Harness will be documented in this file.
+All notable changes to Harness are documented here.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [4.0.0] — 2025-05-13
 
-## [3.0.0] - 2026-04-28
+### Breaking Changes
 
-### Changed
+- **Supervisor PM Loop replaces single-feature flow.** Harness is no longer just a spec→plan→task pipeline. It now governs long-running product delivery through a supervisor–intern delegation model with `.pm/` state management.
+- **Plugin registers one skill, not twelve.** `.claude-plugin/plugin.json` now exposes only `harness` as the sole entry point. All subskills are internal progressive-disclosure modules loaded by the router.
+- **CLI module moved.** `harness_runtime/` relocated to `scripts/harness_runtime/`. Any external imports will break.
 
-- **Architecture pivot**: From template repo to composable skill pack. 18 templates → 12 composable skills.
-- **Skill-based system**: Each skill has a SKILL.md with YAML frontmatter, imperative instructions, and linked reference files (progressive disclosure pattern from mattpocock/skills).
-- **Plugin registry**: `.claude-plugin/plugin.json` registers all 12 skills for Claude Code.
-- **Thin CLI**: `harness_runtime/` Python package with `harness` command for deterministic operations (classify-risk, verify-ai, eval, context, status).
-- **Installer**: `scripts/link-skills.sh` symlinks skills into agent-specific directories.
+### New Features
 
-### Added
+#### Product Evolution (PM Loop)
 
-- **12 skills**: harness-specify, harness-plan, harness-tasks, harness-tdd, harness-risk, harness-eval, harness-report, harness-context, harness-domain-language, harness-grill, harness-architecture-review, harness-init.
-- **DOMAIN-AWARENESS.md**: Universal consumer contract for all engineering skills.
-- **Resources structure**: `resources/templates/`, `resources/policies/`, `resources/examples/`.
-- **Bucket READMEs**: skills/engineering/README.md, skills/productivity/README.md, skills/misc/README.md.
+- **`harness-grill-product`** — Seven-gate product discovery skill. Determines whether a product is worth building, freezes a `.pm/stable/` product contract, and initializes `.pm/runtime/state.yaml`. Routes to supervisor on completion.
+- **`harness-supervisor`** — Low-token PM loop skill. Reads `.pm/` state files, generates bounded task packets, delegates to OpenCode Intern via Task tool or `opencode run`, reviews worker reports, and updates state. Includes iteration limits, consecutive failure breaker, branch correction plans, and hard review gates.
+- **`harness-intern`** — Worker execution skill. Reads `next-task.md`, follows Harness engineering process (risk classify → implement → test → verify → report), writes structured `worker-report.md`. Cannot make product decisions or expand scope.
+- **`opencode-cli`** — CLI reference subskill for programmatic OpenCode invocation. Covers `serve`, `run --attach`, non-interactive mode, and delegation from Codex/Claude Code.
+
+#### PM Runtime Helpers (CLI)
+
+- `harness pm-status` — Runtime health-check
+- `harness pm-next` — Deterministic next-action decision
+- `harness pm-resume` — Resume context for interrupted loops
+- `harness pm-branch-plan` — Read-only branch correction plan
+- `harness pm-summary` — Audit summary of a supervisor loop run
+
+#### Debug Flow
+
+- **`harness-maintain-debug`** — Systematic debugging as a tracked maintenance transaction with 3 Iron Laws: no patch without evidence, no close without regression, escalate after 3 failed hypotheses. Full state machine with resumability.
+- Debug record templates: `DEBUG_INDEX_TEMPLATE.md`, `DEBUG_RECORD_TEMPLATE.md`
+
+#### Cache-Aware Context
+
+- **Cache engineering guide** (`references/CACHE_GUIDE.md`) — Four-layer context ordering (stable → semi-stable → active → dynamic) for prompt cache optimization.
+- `cache-context.yaml` policy declaring layer membership.
+- `harness cache-report` — Token breakdown by cache layer.
+- `harness context <id> --cache-aware --write` — Cache-friendly context bundle.
+
+#### Reference Documentation
+
+- **`references/GETTING_STARTED.md`** — Zero-to-running guide (Chinese). Covers OpenCode setup, AI provider selection, Harness installation, first project, debugging.
+- **`references/PHASE_DETECTION.md`** — Deterministic phase detection from repo artifacts. Covers all phases: no-Harness, product discovery, supervisor loop, worker execution, feature lifecycle, debug, planning.
+- **`references/ROUTING_TABLE.md`** — Complete intent-to-skill mapping table covering product evolution, feature lifecycle, debug, refactor, review, and planning intents.
+- **`references/AUTOPILOT_RULES.md`** — Auto-advance rules by risk level. Fast path for leaf work, standard path for branch, mandatory gates for core/infra.
+
+#### Templates & Examples
+
+- PM templates: `references/templates/pm/` — 24 templates covering product contracts, stage definitions, state files, loop logs, worker configs, acceptance rubrics, handoff notes, and more.
+- Minimal project example: `references/examples/minimal-project/` — Complete example with AGENTS.md, Makefile, spec, plan, tasks, eval, and report.
+- Project `Makefile` with targets: `test`, `verify-ai`, `pm-status`, `pm-next`, `pm-resume`, `pm-branch-plan`, `pm-summary`, `verify`.
+
+#### Testing
+
+- `tests/test_pm_runtime.py` — 1,590 lines of PM runtime validation tests covering state management, loop control, delegation routing, and health checks.
+
+### Improvements
+
+- **Risk classification hardened.** Unknown paths now default to `branch` risk (not `leaf`). Blast-radius policy expanded with explicit path patterns.
+- **Installer writes absolute paths.** `link-skills.sh` no longer produces relative symlinks that break when cwd changes.
+- **Subskills are NOT auto-loaded.** Root SKILL.md now explicitly warns that `subskills/` are internal modules. Router loads them on demand only.
+- **Supervisor protocol hardened.** Slash-command routing, environment-aware delegation (Task tool vs `opencode run`), independent review gate before delegation.
+- **Worker report validation strengthened.** Supervisor rejects reports with missing sections, verifies evidence, and can request rework.
+- **Consecutive failure breaker.** Supervisor stops the loop after consecutive failed iterations, preventing runaway delegation.
+- **Branch correction plans.** Supervisor can generate read-only plans to course-correct when branches diverge from expected state.
 
 ### Removed
 
-- Direct template copying workflow (replaced by skill-based invocation).
-- Bash-only gate scripts (ported to Python CLI).
+- `IMPLEMENTATION_GUIDE.md` — Replaced by `references/GETTING_STARTED.md`
+- `templates/` directory (top-level) — Moved to `references/templates/`
+- `resources/` directory — Merged into `references/`
+- Old bucket-organized skill directories (`skills/engineering/`, `skills/productivity/`, `skills/misc/`) — Flattened into `subskills/`
+- `.pre-commit-config.yaml` template — Removed from templates
 
-## [2.0.0] - 2025-01-28
+### Commits Since v3.0.0
 
-### Added
+50 commits, 181 files changed, 12,255 insertions, 2,477 deletions.
 
-- **Feature Artifact Lifecycle**: Standard spec directory structure (`specs/001-feature-name/`) with `spec.md`, `plan.md`, `tasks.md`, `eval.md`, `report.md`.
-- **Blast Radius Policy** (`templates/BLAST_RADIUS_POLICY.md`): Four risk levels (leaf/branch/core/infra) with YAML frontmatter, decision tree, and classification examples.
-- **Role Policy** (`templates/ROLE_POLICY.md`): TDD role isolation defining RED/GREEN/REFACTOR/REVIEWER/HUMAN with file boundaries and obligations.
-- **AGENTS.md** (`templates/AGENTS.md`): Cross-agent standard document with commands table, architecture rules, and spec-driven workflow. No Claude-specific syntax.
-- **SPEC_TEMPLATE.md**: Feature-level specification template with user scenarios, requirements, success criteria, and clarification markers.
-- **PLAN_TEMPLATE.md**: Technical implementation plan template with DDD layer impact, blast radius classification, and test strategy.
-- **TASKS_TEMPLATE.md**: Task DAG template with parallel markers `[P]`, user story references `[US]`, and exact file paths.
-- **EVAL_TEMPLATE.md**: Evaluation template with product eval and harness eval sections.
-- **REPORT_TEMPLATE.md**: Implementation report template with files changed, risk classification, and rollback plan.
-- **QUICKSTART_TEMPLATE.md**: Quickstart template with manual and automated validation paths.
-- **CONTRACT_TEMPLATE.md**: Contract placeholder template for OpenAPI/protobuf/event schemas.
-- **DATA_MODEL_TEMPLATE.md**: Data model template for entity/schema/migration documentation.
-- **CONSTITUTION_TEMPLATE.md**: Project principles and governance template.
-- **scripts/classify-risk.sh**: Path-based risk classifier outputting leaf/branch/core/infra.
-- **scripts/verify-ai.sh**: Template integrity verification checking file existence, line counts, and branding.
-- **examples/minimal-project/**: Example project demonstrating Harness v2 usage with filled artifacts.
-- `make spec-init FEATURE=001-name` target: Creates feature spec directories from templates.
-- `make verify-ai` target: Runs harness/process verification.
-- `make classify-risk` target: Classifies current diff risk level.
-- `make security-scan` target: Runs gitleaks when available.
-- VERSION file set to `2.0.0`.
+---
+
+## [3.0.0] — 2026-04-28
 
 ### Changed
 
-- **PRD_TEMPLATE.md**: Rewritten with user stories, functional/non-functional requirements, success criteria, ambiguity markers, and out-of-scope section.
-- **CLAUDE.md**: Refactored to under 200 lines as a routing layer referencing policies and spec artifacts.
-- **Makefile**: Upgraded with v2 targets (`spec-init`, `verify-ai`, `classify-risk`, `security-scan`, `typecheck`, `contract-test`).
-- **README.md**: Rewritten for v2 with quick start, workflow diagram, template inventory, and risk levels.
-- **MANIFESTO.md**: Added Risk-Classified Autonomy principle.
-- **CONTRIBUTING.md**: Updated Golden Path to 14-step spec-first workflow.
-- **ARCHITECTURE.md**: Removed TODO, added DDD-to-blast-radius mapping table.
-- **IMPLEMENTATION_GUIDE.md**: Added spec-init and spec lifecycle adoption path.
-- **.pre-commit-config.yaml**: Upgraded with secret scanning and commit conventions.
+- Restructured from bucket-organized directories to flat `subskills/` + `references/`.
+- Plugin registers single `harness` entry point instead of 12 separate skills.
+- Python CLI with 9 commands replacing bash scripts.
+- Templates as resources, skills as source of truth.
+- Added debug flow with 3 Iron Laws and 7-phase state machine.
 
-### Removed
+---
 
-- All "Neural-Grid" branding references.
-- Inconsistent "Framework" naming replaced with "Harness".
+## [2.0.0] — 2026-04-27
+
+### Changed
+
+- Spec-governed, risk-classified engineering harness.
+- 12 flat skills, 18 template files.

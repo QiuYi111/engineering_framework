@@ -1,176 +1,298 @@
 <div align="center">
   <h1>Harness</h1>
-  <p><em>A root skill with progressively disclosed subskills for governed AI engineering.</em></p>
+  <p>给你的 AI 编程助手加一层 PM。</p>
 </div>
 
-## What is Harness?
+---
 
-Harness is a single skill pack — one root `harness` skill that automatically detects your engineering phase, routes to the right internal subskill, and runs deterministic CLI gates.
+Harness 做一件事：让 AI 编程助手能够长期自主推进一个产品，同时不失控、不搞乱你的代码库。
 
-Most users never need to pick a subskill manually. Invoke `harness`, say "use Harness", or just describe your task. The router handles the rest.
+你给一个模糊的目标——"帮我做一个记账 App"——Harness 接管剩下的工作：澄清产品定义、拆解任务、委派给工人 Agent 执行、审查产出、更新状态、循环推进。你可以离开，回来的时候看到的是清晰的进展、证据和下一步。
 
-No mandatory pipeline. No framework to submit to. Subskills are internal modules loaded on demand by the router — they are not exposed as standalone entries.
+## 它不是什么
 
-## Two Flows
+不是框架，不是平台，不是另一个项目管理工具。Harness 是一个 skill pack——一组装在你现有编程助手（OpenCode、Claude Code、Codex）里的技能。你的助手加载一个入口 skill，剩下的由路由器自动处理。
 
-Harness governs two distinct engineering flows:
+不强制走流程。如果你只是想修个 typo，不需要走产品发现。风险分类器会判断你的改动有多大的爆炸半径，然后决定需要多少过程。
+
+## 三条路径
 
 ```text
-Feature Flow (build)              Debug Flow (repair)
-─────────────────────             ─────────────────────
-grill → specify → plan            reproduce → evidence → diagnose
-  → tasks → risk → context          → patch → regression → review
-  → tdd → eval → report             → (eval → report if risk ≥ branch)
+产品进化（PM 循环）          功能构建（工程流）           调试修复（维修流）
+───────────────────        ─────────────────         ─────────────────
+grill-product → supervisor  specify → plan → tasks     reproduce → evidence → diagnose
+  → intern → review           → risk → context → tdd    → patch → regression → review
+  → state update → 循环        → eval → report           → (risk ≥ branch 时加 eval + report)
 ```
 
-- **Feature Flow**: Idea → spec → plan → tasks → code → verify → ship
-- **Debug Flow**: Symptom → reproduce → root cause → minimal patch → regression test → close
+三条路径共享同一套风险分类体系，但在过程上有不同的侧重。
 
-Both flows share the same risk classification system. Debug adds 3 Iron Laws: no patch without evidence, no close without regression, escalate after 3 failed hypotheses.
-
-## Quick Start
+## 快速开始
 
 ```bash
 git clone https://github.com/QiuYi111/Harness
 cd Harness
-pip install -e .                    # editable install only (see below)
+pip install -e .
 ./scripts/link-skills.sh claude-code
 ```
 
-Your agent now loads one skill: `harness`. The router inside detects phases and loads subskills as needed.
+然后在你常用的编程助手里输入 `/harness`，或者说一句你想做什么。路由器会检测你处于哪个阶段，加载对应的子技能。
 
-> **Note:** Harness currently supports **source/editable install** (`pip install -e .`). Standard wheel packaging is planned but not yet available. The CLI works from the cloned repo directory.
+> 目前只支持源码安装（`pip install -e .`）。wheel 打包计划中。
 
-## How It Works
+---
 
-```text
-harness (entry router)
-  │
-  ├─ detect phase ───────────────────────┐
-  ├─ route to right subskill              │
-  ├─ run CLI gate (classify-risk, etc.)   │ references/ (policies, templates, protocols)
-  └─ auto-advance until risk gate         │
-                                           │
-  subskills/ (loaded on demand) ◄─────────┘
-  ├── specify   plan   tasks    tdd   risk
-  ├── context   eval   report   cache
-  ├── maintain-debug   grill   architecture-review
-  ├── domain-language   init
-  └── (14 total)
+## 为什么需要这个
+
+AI 编程助手完成一个明确的任务没问题。但如果你让它自主跑几个小时——修 bug、加功能、重构——很快就会出问题：
+
+- 没有产品合同，Agent 会在第 10 轮开始偏航
+- 没有状态追踪，中断后无法恢复
+- 没有审查机制，Agent 会悄悄越界改不该改的东西
+- 没有失败熔断，一个坏了的任务会反复重试直到烧光 token
+
+Harness 解决这些问题。不是靠更聪明的 prompt，而是靠工程纪律。
+
+---
+
+## 我们做了什么
+
+下面是我们在设计和实现中真正花心思的地方。不是营销话术，是实实在在的工程决策。
+
+### 安全机制
+
+**风险分类不是建议，是强制门禁。**
+
+每一个改动在执行前都要经过爆炸半径分类。我们有四个等级：
+
+| 等级 | 自主权 | 触及什么 | 必须通过的门禁 |
+|------|--------|----------|----------------|
+| `leaf` | 高 | 文档、测试、独立组件 | lint + 单元测试 |
+| `branch` | 中 | 功能、服务、接口 | spec + plan + 测试 + review |
+| `core` | 低 | 领域模型、权限、认证 | 人工审 spec + 架构审 + 回滚计划 + 安全审 |
+| `infra` | 极低 | 部署、CI/CD、密钥 | 以上全部 + dry run + 明确人工签字 |
+
+这些不是写在 README 里的指南，是机器可解析的策略文件（`blast-radius.yaml`、`gates.yaml`）。CLI 真正会读取它们、检查文件、阻止不符合要求的操作。拿不准的时候，自动升级到更高风险等级。
+
+**连续失败熔断器。** Supervisor 循环追踪连续失败次数。同一个工人连续 3 次提交不合格的报告，循环自动停止，把问题交给人类。不是计数然后继续——是真的停下来。
+
+**12 个停止条件。** 产品定位要变？停。MVP 边界要变？停。核心技栈要变？停。触及 core/infra 风险？停。涉及安全、认证、支付、部署？停。工人报告缺少证据？停。测试过不了且前路不明？停。不是建议性的——是硬停止。
+
+**独立审查。** 当工人的声明具有实质影响（"所有测试通过"、"没有触碰禁止范围"），Supervisor 会启动一个独立的审查 Agent，专门验证这些声明。不是信任工人的报告——是独立核实。
+
+**调试铁律。** 三条，不可违反：
+
+```
+1. 没有复现和证据，不写补丁。
+2. 没有回归测试，不关闭问题。
+3. 连续三个假设失败，停止并上报。
 ```
 
-## Core Ideas
+违反这些规则就不是在调试，是在瞎猜。第三条特别重要——连续三个补丁失败，说明问题可能出在架构层面，不是修修补补能解决的。这时候应该停下来讨论，而不是继续试。
 
-- **Entry Router.** The `harness` skill detects your current phase (no spec → intake → planning → implementation → verification → debug) and loads the right subskill. You don't pick subskills; the router routes you.
-- **Two Flows.** Feature flow for building, debug flow for repairing. Both share risk classification but have different phase sequences.
-- **Risk-Classified Autonomy.** Agent freedom scales with blast radius. Leaf changes proceed unattended. Core/infra changes require explicit human approval.
-- **TDD Role Isolation.** RED/GREEN/REFACTOR/REVIEWER roles with file-level boundaries enforced by `harness verify-ai`.
-- **Debug Iron Laws.** No patch without evidence. No close without regression. Escalate after 3 failed hypotheses.
-- **Cache-Aware Context Assembly.** Stable content first, dynamic content last. `harness context --cache-aware` produces cache-friendly context bundles.
-- **DDD Enforcement.** Domain logic depends on nothing. Infrastructure depends on the domain, never the reverse.
+### 性能
 
-## Risk Levels
+**上下文缓存工程。** LLM 提供商对缓存的前缀 token 收费更低。Harness 把上下文按稳定性分成四层：
 
-| Level | Autonomy | What | Required Gates |
-|-------|----------|------|----------------|
-| `leaf` | High | Docs, tests, isolated components | lint, unit_test |
-| `branch` | Medium | Features, services, endpoints | spec, plan, tests, review |
-| `core` | Low | Domain model, auth, permissions | human_review, architecture_review, rollback_plan, security_review |
-| `infra` | Very Low | Deployment, CI/CD, secrets | dry_run, human_approval, rollback_plan, security_review |
+```
+稳定层（几乎不变）    → SKILL.md、策略文件、领域语言
+半稳定层（偶尔变化）  → 架构文档、ADR 记录
+活跃层（跟着功能走）  → spec、plan、tasks
+动态层（每次调用都变）→ 用户请求、git diff、测试输出
+```
 
-When uncertain, escalate to the higher risk level.
+顺序很重要：稳定在前，动态在后。这样做的好处是：
+
+- 多轮对话中，前面的稳定内容不会因为后面的变化而失效
+- Agent 不需要每轮重新读一遍协议文件
+- 长会话中，稳定内容不太可能被上下文窗口截断丢失
+- 同一个功能，每次组装出的上下文结构一致，行为可预测
+
+这不是理论上的优化。`harness context --cache-aware` 真的会按照这个顺序组装上下文，`cache-context.yaml` 声明了每一层的文件范围。
+
+**确定性优先。** 能用 CLI 做的事不用 Agent 判断。风险分类、spec 检查、gate 验证——这些都是确定性的，交给 `harness` CLI 命令处理。Agent 只负责需要判断的部分：写代码、理解需求、做产品决策。这样既省 token，又减少不确定性。
+
+### 可恢复性
+
+**状态机设计。** 整个 Supervisor 循环是一个显式的状态机，每一步都有对应的文件：
+
+- `state.yaml` — 当前状态、迭代计数、失败追踪
+- `loop-control` — 一个值：`CONTINUE` | `STOP` | `NEEDS_USER_DECISION` | `BLOCKED` | `STAGE_EXIT_REACHED`
+- `loop-log.md` — 每次迭代的日志
+- `handoff.md` — 当前的完整状态摘要，用于断点恢复
+
+中断后恢复时，Supervisor 读 `handoff.md`、`state.yaml`、最近 3 条 `loop-log.md`，然后从上次停下的地方继续。不是猜测——是从文件中恢复确切的状态。
+
+**工人角色隔离。** Supervisor 是 PM，Intern 是工程师。Supervisor 不写代码，Intern 不做产品决策。Supervisor 可以读 `.pm/` 文件、写任务包、审查报告、更新状态。但不能改产品定位、不能批 core/infra 风险、不能直接实现代码。这些权限边界写在 `authority.md` 里。
+
+**文件写入规则。** 每一次状态变更必须有对应的 loop-log 条目。每一个任务包必须有验收标准。每一次验收审查必须有证据。不能凭空写"accepted"——必须附上验证了什么。
+
+### 测试
+
+我们写了 1,590 行测试来验证 PM runtime 的行为——状态解析、循环控制、委派路由、健康检查、工人报告校验、分支策略验证、失败断路器、恢复上下文生成。每一个安全机制都有对应的测试。
+
+---
+
+## 子技能
+
+以下是 Harness 内部的 18 个子技能。你不需要手动选择——路由器会根据你的阶段自动加载。
+
+### 产品进化
+
+| 子技能 | 做什么 |
+|--------|--------|
+| **grill-product** | 7 道关卡的产品发现，确认值不值得做、给谁做、做什么、不做什么 |
+| **supervisor** | PM 循环：观察 → 决策 → 写任务 → 委派 → 审查报告 → 更新状态 |
+| **intern** | 工人：读任务 → 风险分类 → 实现 → 测试 → 验证 → 写报告 |
+| **opencode-cli** | 编程式调用 OpenCode 的命令参考，用于跨 Agent 委派 |
+
+### 功能构建
+
+| 子技能 | 做什么 |
+|--------|--------|
+| **specify** | 写功能规格——用户故事、场景、验收标准 |
+| **plan** | 实现计划——架构影响、DDD 层影响、回滚方案 |
+| **tasks** | 纵切任务图——依赖关系、可并行标记、精确文件路径 |
+| **tdd** | 角色隔离的 TDD——RED/GREEN/REFACTOR/REVIEWER，文件边界强制执行 |
+| **eval** | 对照规格评估实现，检查过程合规性 |
+| **report** | 实现报告——改了什么、风险多高、怎么回滚 |
+
+### 调试修复
+
+| 子技能 | 做什么 |
+|--------|--------|
+| **maintain-debug** | 系统化调试——7 阶段状态机、3 条铁律、可追踪的维修记录 |
+
+### 横切关注点
+
+| 子技能 | 做什么 |
+|--------|--------|
+| **risk** | 爆炸半径分类，决定需要走哪些门禁 |
+| **context** | 最小上下文打包，减少 Agent 的上下文污染 |
+| **cache** | 缓存友好的上下文组装，稳定内容优先 |
+| **domain-language** | DDD 统一语言、CONTEXT.md、ADR 记录 |
+| **grill** | 用尖锐的问题压力测试你的计划或规格 |
+| **architecture-review** | 找浅模块、DDD 依赖违规、可测试性缺陷 |
+| **init** | 用 Harness 工程纪律初始化一个项目 |
+
+---
 
 ## CLI
 
-The deterministic CLI handles what can be done without judgment:
+确定性的操作交给 CLI，不需要 Agent 判断的就不让 Agent 判断。
 
 ```bash
-harness init                  # Initialize a project
-harness install-skills        # Symlink skills to agent dir
-harness specify 001-feature   # Create feature skeleton
-harness classify-risk         # Classify blast radius from changed files
-harness verify-ai             # Check skill-pack integrity + role boundaries
-harness eval 001-feature      # Run spec compliance checks
-harness context 001-feature   # Generate context bundle
-harness context 001-feature --cache-aware --write  # Cache-friendly bundle
-harness cache-report          # Token breakdown by cache layer
-harness status                # Show active features + gate status
+harness status                     # 查看当前活跃功能和门禁状态
+harness classify-risk              # 根据修改文件分类爆炸半径
+harness verify-ai                  # 检查 skill pack 完整性 + 角色边界
+harness init                       # 初始化项目
+harness specify 001-feature        # 创建功能骨架
+harness eval 001-feature           # 规符合规性检查
+harness context 001-feature        # 生成最小上下文包
+harness context 001-feature --cache-aware --write  # 缓存友好的上下文包
+harness cache-report               # 按缓存层级拆解 token 用量
+harness pm-status                  # PM 循环健康检查
+harness pm-next                    # 确定性的下一步决策
+harness pm-resume                  # 中断后的恢复上下文
+harness pm-branch-plan             # 只读的分支纠正计划
+harness pm-summary                 # 循环运行的审计摘要
 ```
 
-CLI commands handle deterministic operations. Skills handle judgment.
+---
 
-## Internal Subskills
-
-These are loaded on demand by the harness router. You can invoke them directly, but you rarely need to:
-
-### Feature Flow
-
-| Subskill | Purpose |
-|----------|---------|
-| **specify** | Create feature specs with user stories, scenarios, success criteria |
-| **plan** | Implementation plan with architecture impact and risk classification |
-| **tasks** | Vertical-slice task DAG with dependencies and parallel markers |
-| **tdd** | Role-isolated TDD: RED/GREEN/REFACTOR/REVIEWER with file boundaries |
-| **eval** | Evaluate implementation against spec and process compliance |
-| **report** | Implementation report with evidence, risk, rollback plan |
-
-### Debug Flow
-
-| Subskill | Purpose |
-|----------|---------|
-| **maintain-debug** | Systematic debugging as a maintenance transaction: symptom → root cause → minimal patch → regression |
-
-### Cross-Cutting
-
-| Subskill | Purpose |
-|----------|---------|
-| **risk** | Classify change by blast radius and determine required gates |
-| **context** | Minimal context bundle to reduce agent context pollution |
-| **cache** | Cache-friendly context assembly with stable-first ordering |
-| **domain-language** | DDD ubiquitous language, CONTEXT.md, ADR records |
-| **grill** | Stress-test plans and specs with pointed questions |
-| **architecture-review** | Find shallow modules, DDD violations, testability gaps |
-| **init** | Initialize a project with Harness engineering discipline |
-
-## Directory Structure
+## 目录结构
 
 ```
-Harness/                   # This IS the harness skill — clone directly
-├── SKILL.md               # Root entry point (router/autopilot)
-├── subskills/             # Internal progressive-disclosure modules
-│   ├── harness-maintain-debug/    # Debug flow (7 phases)
-│   │   ├── SKILL.md
-│   │   └── references/            # root-cause-tracing, defense-in-depth
-│   └── ...                        # 13 other subskills
-├── references/            # Shared policies, templates, routing tables
-│   ├── ROUTING_TABLE.md           # Intent-to-skill mapping
-│   ├── PHASE_DETECTION.md         # Phase detection from repo artifacts
-│   ├── AUTOPILOT_RULES.md         # Auto-advance rules per risk level
-│   ├── DOMAIN-AWARENESS.md        # Domain terminology and DDD rules
-│   ├── policies/                  # blast-radius.yaml, gates.yaml, cache-context.yaml
-│   ├── templates/                 # Project scaffolds (spec, plan, debug record…)
-│   └── licenses/                  # MIT attribution for adapted works
-├── scripts/               # Installer + thin CLI runtime
-│   ├── harness_runtime/           # Python CLI modules
-│   └── link-skills.sh             # Skill installer
-├── .claude-plugin/        # Plugin registry (registers harness as sole entry)
-├── MANIFESTO.md           # Engineering principles
-├── README.md
-└── VERSION
+Harness/
+├── SKILL.md                  # 入口路由器
+├── subskills/                # 18 个内部子技能（按需加载）
+│   ├── grill-product/        # 产品发现（7 道关卡）
+│   ├── supervisor/           # PM 循环（8 步迭代）
+│   │   └── references/       # 权限矩阵、循环步骤、安全机制
+│   ├── intern/               # 工人执行
+│   ├── maintain-debug/       # 调试流（7 阶段，3 铁律）
+│   ├── tdd/                  # 角色隔离 TDD
+│   └── ...                   # specify, plan, tasks, risk, context, cache,
+│                              # eval, report, grill, architecture-review,
+│                              # domain-language, init, opencode-cli
+├── references/               # 共享策略、模板、路由表
+│   ├── ROUTING_TABLE.md      # 意图→技能映射
+│   ├── PHASE_DETECTION.md    # 阶段检测规则
+│   ├── AUTOPILOT_RULES.md    # 各风险等级的自动推进规则
+│   ├── CACHE_GUIDE.md        # 缓存工程指南
+│   ├── GETTING_STARTED.md    # 从零开始指南
+│   ├── policies/             # blast-radius, gates, cache-context, project_index
+│   ├── templates/            # 项目脚手架模板
+│   │   └── pm/               # 24 个 PM 循环状态模板
+│   └── examples/             # 最小项目示例
+├── scripts/
+│   ├── harness_runtime/      # Python CLI 模块
+│   └── link-skills.sh        # 技能安装脚本
+├── tests/                    # PM runtime 测试（1,590 行）
+├── Makefile                  # test, verify-ai, pm-status, …
+├── .claude-plugin/           # 插件注册（harness 为唯一入口）
+├── CHANGELOG.md
+├── VERSION
+└── README.md
 ```
 
-## What Changed from v2
+---
 
-| v2 | v3 |
+## 它怎么工作
+
+```
+用户说"帮我做个记账 App"
+        │
+        ▼
+  harness 路由器检测阶段
+        │
+        ▼
+  产品定义缺失 → 加载 grill-product
+        │
+        ▼
+  7 道关卡跑完 → 冻结 .pm/stable/ 产品合同
+        │
+        ▼
+  加载 supervisor，开始 PM 循环
+        │
+   ┌────┴────┐
+   │         │
+   ▼         ▼
+ 写任务包   检查就绪状态
+   │         │
+   ▼         │
+ 委派给     │
+ intern ────┘
+   │
+   ▼
+ intern 执行：风险分类 → 实现 → 测试 → 验证 → 写报告
+   │
+   ▼
+ supervisor 审查报告
+   │
+   ├── 通过 → 更新状态 → 下一轮迭代
+   ├── 不通过 → 写返工意见 → consecutive_failures++
+   └── 连续 3 次不通过 → 停止，交给人类
+```
+
+---
+
+## v3 → v4 变了什么
+
+| v3 | v4 |
 |---|---|
-| Template repo — copy-paste workflow | Skill pack — agent loads harness, router does the rest |
-| 18 template files, 12 flat skills | 1 root skill, 14 internal subskills |
-| Bash scripts for gates | Python CLI with 9 commands |
-| Templates as source of truth | Skills as source of truth, templates as resources |
-| Bucket-organized directories | Flat subskills/ + references/ structure |
-| Feature flow only | Feature flow + debug flow with shared risk system |
-| No debug discipline | 3 Iron Laws, 7-phase debug, state machine with resumability |
+| 功能流 + 调试流 | 产品进化流 + 功能流 + 调试流 |
+| 单功能管道 | Supervisor–Intern 委派模型 + `.pm/` 状态管理 |
+| 14 个子技能 | 18 个子技能（+grill-product, supervisor, intern, opencode-cli） |
+| 没有 PM 循环 | 24 个 PM 模板、5 个 PM CLI 命令、1,590 行测试 |
+| 9 个 CLI 命令 | 14 个 CLI 命令 |
+| 没有缓存工程 | 四层上下文排序 + `harness cache-report` |
+| 只有英文文档 | 中文入门指南（586 行） |
 
-## License
+50 个 commit，181 个文件变更，+12,255 / -2,477 行。
+
+详细变更记录见 [CHANGELOG.md](./CHANGELOG.md)。
+
+## 许可
 
 MIT
