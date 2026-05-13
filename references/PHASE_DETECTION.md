@@ -87,17 +87,29 @@ Action: use `harness-maintain-debug`
 Signals: context too large, agent repeatedly reading same files, user asks about cache/cost/token reduction
 Action: use `harness-cache`, then `harness-context`
 
+## Code Semantic Atlas Phase
+
+Signals:
+- User says "atlas", "semantic map", "audit this code", "代码语义地图", "语义审计"
+- User wants to understand code behavior without reading source
+- User asks "这段代码在做什么", "帮我搞懂这个模块", "code audit"
+- PR review needs structured understanding, not just diff reading
+- User inherits unfamiliar codebase
+
+Action: use `harness-atlas`
+
 ## Detection Algorithm
 
 For a given repository:
 
 0. **Check user intent for product discovery signals** (".pm/", "product idea", "worth building", "goal", "supervisor", "MVP", "UI direction", "I have an idea") — if detected, route to `harness-grill-product` or `harness-supervisor` regardless of whether `.harness/` exists. Product discovery does NOT require Harness to be installed.
-1. Check for `.harness/` and `AGENTS.md` -> if missing, No Harness
-2. **Check for PM/product signals** (".pm/", "product idea", "worth building", "goal", "supervisor") -> if `.pm/` exists, check state.yaml for phase; if `.pm/` missing and product keywords present, Product Discovery Phase
-3. **Check for debug signals** (bug keywords, error logs, stack traces, "fix", "broken", "not working") -> if present, Maintenance Debug Phase
-4. **Check for refactor signals** ("refactor", "clean up", "remove dead code", "optimize") -> if present, run `harness-specify` first (lightweight refactor scope), then route to plan → tasks → tdd
-5. Check `specs/` for feature directories -> if none with spec.md, Intake Phase
-6. For each feature, check artifact presence in order: spec -> plan -> tasks -> eval -> report
-7. The earliest missing artifact determines the phase
-8. If all artifacts present and code changes are requested, Implementation Phase
-9. If all artifacts present and user asks about completion, Verification Phase
+1. **Check for atlas/audit signals** ("atlas", "semantic map", "audit this code", "代码语义地图", "语义审计", "帮我搞懂") — if detected, route to `harness-atlas` regardless of whether Harness is installed.
+2. Check for `.harness/` and `AGENTS.md` -> if missing, No Harness
+3. **Check for PM/product signals** (".pm/", "product idea", "worth building", "goal", "supervisor") -> if `.pm/` exists, check state.yaml for phase; if `.pm/` missing and product keywords present, Product Discovery Phase
+4. **Check for debug signals** (bug keywords, error logs, stack traces, "fix", "broken", "not working") -> if present, Maintenance Debug Phase
+5. **Check for refactor signals** ("refactor", "clean up", "remove dead code", "optimize") -> if present, run `harness-specify` first (lightweight refactor scope), then route to plan → tasks → tdd
+6. Check `specs/` for feature directories -> if none with spec.md, Intake Phase
+7. For each feature, check artifact presence in order: spec -> plan -> tasks -> eval -> report
+8. The earliest missing artifact determines the phase
+9. If all artifacts present and code changes are requested, Implementation Phase
+10. If all artifacts present and user asks about completion, Verification Phase
